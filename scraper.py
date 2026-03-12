@@ -93,8 +93,8 @@ async def scrape_url(url: str, session: aiohttp.ClientSession) -> Dict[str, Any]
 
 async def scrape_all_urls(urls: List[str], use_dynamic_fallback: bool = True) -> List[Dict[str, Any]]:
     """
-    Scrape multiple URLs concurrently. If a URL returns empty text and
-    use_dynamic_fallback is True, attempt Selenium-based scraping in a thread.
+    multiple URLs concurrently. If a URL returns empty and
+    use_dynamic_fallback is on, Selenium-based scrape in a thread.
     """
     # De-duplicate URLs
     unique_urls = list(dict.fromkeys(urls))
@@ -116,3 +116,4 @@ async def scrape_all_urls(urls: List[str], use_dynamic_fallback: bool = True) ->
                     logger.error(f"Selenium fallback failed for {url}: {e}")
 
     return results
+
