@@ -1,28 +1,62 @@
 import sqlite3
+from contextlib import contextmanager
+from typing import Iterable, Tuple, List
 
-# Create the database and table (if not already created)
+
+DB_PATH = "scraped_data.db"
+
+
+@contextmanager
+def get_connection():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def create_db():
-    conn = sqlite3.connect('scraped_data.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS sentiment_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT,
-            sentiment TEXT,
-            text TEXT
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sentiment_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT,
+                sentiment TEXT,
+                score REAL,
+                text TEXT
+            )
+            """
         )
-    ''')
-    conn.commit()
-    conn.close()
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_sentiment_url
+            ON sentiment_data (url)
+            """
+        )
+        conn.commit()
 
-# Insert data into the database
-def save_to_db(conn, url, sentiment, text):
+
+def save_many_to_db(
+    conn: sqlite3.Connection,
+    rows: Iterable[Tuple[str, str, float, str]]
+) -> None:
+    """
+    Batch insert rows: (url, sentiment, score, text)
+    """
     cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO sentiment_data (url, sentiment, text)
-        VALUES (?, ?, ?)
-    ''', (url, sentiment, text))
+    cursor.executemany(
+        """
+        INSERT INTO sentiment_data (url, sentiment, score, text)
+        VALUES (?, ?, ?, ?)
+        """,
+        list(rows),
+    )
     conn.commit()
 
-# Initialize the database
-create_db()
+
+def fetch_all(conn: sqlite3.Connection) -> List[Tuple]:
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, url, sentiment, score FROM sentiment_data")
+    return cursor.fetchall()
