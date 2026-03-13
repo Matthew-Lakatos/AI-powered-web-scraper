@@ -19,11 +19,12 @@ dependencies = [
     "uvicorn",
     "streamlit",
     "python-dotenv",
-    "pydantic>=1.10"
+    "pydantic>=1.10",
     "typer[all]"
 ]
 
 [project.scripts]
+sentiment = "cli:app"
 sentiment-run = "main:main"
 sentiment-api = "uvicorn api:app --host 0.0.0.0 --port 8000"
 sentiment-dashboard = "streamlit run dashboard.py"
