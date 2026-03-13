@@ -1,7 +1,7 @@
 [project]
 name = "sentiment_pipeline"
 version = "0.1.0"
-description = "Asynchronous web scraper with sentiment and NLP analysis"
+description = "Asynchronous web scraper with sentiment and NLP analysis, FastAPI API, and Streamlit dashboard."
 authors = [{ name = "Mat" }]
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,13 +18,14 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "streamlit",
-    "python-dotenv"
+    "python-dotenv",
+    "pydantic>=1.10"
 ]
 
 [project.scripts]
-sentiment-api = "api:app"
-sentiment-dashboard = "dashboard:main"
 sentiment-run = "main:main"
+sentiment-api = "uvicorn api:app --host 0.0.0.0 --port 8000"
+sentiment-dashboard = "streamlit run dashboard.py"
 
 [tool.setuptools]
 packages = ["."]
