@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from scraper import scrape_all_urls
-from analyzer import analyze_sentiment
+from analyzer import analyze_all
 from database import create_db, get_connection, save_many_to_db
 
 
@@ -14,7 +14,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# testing urls
 URLS: List[str] = [
     "https://en.wikipedia.org/wiki/Artificial_intelligence",
     "https://www.bbc.com/news/technology",
@@ -30,13 +29,22 @@ async def run_pipeline(urls: List[str]) -> None:
     for item in scraped_data:
         url = item["url"]
         text = item.get("text", "") or ""
-        sentiment_result = analyze_sentiment(text)
-        sentiment_label = sentiment_result["label"]
-        sentiment_score = sentiment_result["score"]
 
-        logger.info(f"URL: {url} | Sentiment: {sentiment_label} ({sentiment_score:.3f})")
+        full_analysis = analyze_all(text)
+        sentiment = full_analysis["sentiment"]
+        sentiment_label = sentiment["label"]
+        sentiment_score = sentiment["score"]
 
+        logger.info(
+            f"URL: {url} | Sentiment: {sentiment_label} ({sentiment_score:.3f}) "
+            f"| Topics: {full_analysis['topics']} "
+            f"| Keywords: {full_analysis['keywords']}"
+        )
+
+        # DB schema unchanged: store sentiment + raw text
         rows_to_insert.append((url, sentiment_label, sentiment_score, text))
+
+        # If you later extend DB, you can also store summary, topics, etc.
 
     create_db()
     with get_connection() as conn:
