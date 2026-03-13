@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Monitor:
     scraped: int = 0
@@ -22,6 +23,22 @@ class Monitor:
         return {
             "scraped": self.scraped,
             "cached": self.cached,
-            "avg_scrape_time": sum(self.scrape_times) / len(self.scrape_times) if self.scrape_times else 0,
-            "avg_nlp_time": sum(self.nlp_times) / len(self.nlp_times) if self.nlp_times else 0,
+            "avg_scrape_time": (
+                sum(self.scrape_times) / len(self.scrape_times)
+                if self.scrape_times else 0
+            ),
+            "avg_nlp_time": (
+                sum(self.nlp_times) / len(self.nlp_times)
+                if self.nlp_times else 0
+            ),
         }
+
+
+class Timer:
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.end = time.perf_counter()
+        self.duration = self.end - self.start
