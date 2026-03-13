@@ -25,7 +25,8 @@ def create_db():
                 url TEXT,
                 sentiment TEXT,
                 score REAL,
-                text TEXT
+                text TEXT,
+                last_scraped TIMESTAMP
             )
             """
         )
