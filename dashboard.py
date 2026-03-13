@@ -1,58 +1,157 @@
 import streamlit as st
-import requests
 import pandas as pd
+import requests
+import plotly.express as px
+import json
+from collections import Counter
 
-from config import settings
+API = "http://localhost:8000"
 
-API_URL = f"http://{settings.api_host}:{settings.api_port}"
+st.set_page_config(page_title="AI Scraper Dashboard", layout="wide")
 
+st.title("AI Web Scraper Analytics Dashboard")
 
-def main():
-    st.title("Web Sentiment & NLP Dashboard")
+# Fetch data
+res = requests.get(f"{API}/results").json()
 
-    # Stats
-    st.subheader("Pipeline Stats")
-    try:
-        stats = requests.get(f"{API_URL}/stats").json()
-        st.json(stats)
-    except Exception as e:
-        st.error(f"Could not fetch stats: {e}")
+data = res["results"]
 
-    # Results
-    st.subheader("Scraped Results")
-    try:
-        data = requests.get(f"{API_URL}/results").json()["results"]
-        df = pd.DataFrame(
-            data,
-            columns=[
-                "url",
-                "sentiment",
-                "score",
-                "keywords",
-                "topics",
-                "summary",
-                "emotions",
-                "last_scraped",
-            ],
-        )
-        st.dataframe(df)
-    except Exception as e:
-        st.error(f"Could not fetch results: {e}")
+if not data:
+    st.warning("No data yet.")
+    st.stop()
 
-    # Trigger scrape
-    st.subheader("Trigger New Scrape")
-    urls_text = st.text_area("Enter URLs (one per line)")
-    urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
-    if st.button("Scrape") and urls:
-        try:
-            resp = requests.post(f"{API_URL}/scrape", json=urls)
-            if resp.status_code == 200:
-                st.success("Scrape triggered!")
-            else:
-                st.error(f"Error triggering scrape: {resp.text}")
-        except Exception as e:
-            st.error(f"Error triggering scrape: {e}")
+df = pd.DataFrame(data)
 
+df["last_scraped"] = pd.to_datetime(df["last_scraped"])
 
-if __name__ == "__main__":
-    main()
+# -------------------------------
+# METRICS
+# -------------------------------
+
+metrics = requests.get(f"{API}/metrics").json()
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Records", metrics["total_records"])
+col2.metric("Unique URLs", metrics["unique_urls"])
+col3.metric("Positive Sentiment", metrics["sentiment_breakdown"].get("POSITIVE",0))
+
+st.divider()
+
+# -------------------------------
+# SENTIMENT DISTRIBUTION
+# -------------------------------
+
+st.subheader("Sentiment Distribution")
+
+sentiment_counts = df["sentiment"].value_counts()
+
+fig = px.pie(
+    names=sentiment_counts.index,
+    values=sentiment_counts.values,
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# SENTIMENT TREND
+# -------------------------------
+
+st.subheader("Sentiment Trend")
+
+trend = df.groupby([
+    pd.Grouper(key="last_scraped", freq="H"),
+    "sentiment"
+]).size().reset_index(name="count")
+
+fig = px.line(
+    trend,
+    x="last_scraped",
+    y="count",
+    color="sentiment"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# SCRAPING ACTIVITY
+# -------------------------------
+
+st.subheader("Scraping Activity")
+
+activity = df.groupby(
+    pd.Grouper(key="last_scraped", freq="H")
+).size().reset_index(name="scrapes")
+
+fig = px.bar(
+    activity,
+    x="last_scraped",
+    y="scrapes"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# KEYWORD ANALYTICS
+# -------------------------------
+
+st.subheader("Top Keywords")
+
+keywords = []
+
+for row in df["keywords"]:
+    if isinstance(row, list):
+        keywords.extend(row)
+
+kw_series = pd.Series(keywords).value_counts().head(20)
+
+st.bar_chart(kw_series)
+
+# -------------------------------
+# TOPICS
+# -------------------------------
+
+st.subheader("Topic Frequency")
+
+topics = []
+
+for t in df["topics"]:
+    if isinstance(t, list):
+        topics.extend(t)
+
+topic_counts = pd.Series(topics).value_counts().head(15)
+
+st.bar_chart(topic_counts)
+
+# -------------------------------
+# EMOTION ANALYSIS
+# -------------------------------
+
+st.subheader("Emotion Analysis")
+
+emotion_totals = Counter()
+
+for e in df["emotions"]:
+    if isinstance(e, dict):
+        emotion_totals.update(e)
+
+emotion_df = pd.DataFrame(
+    emotion_totals.items(),
+    columns=["emotion","count"]
+)
+
+fig = px.bar(
+    emotion_df,
+    x="emotion",
+    y="count"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# DATA TABLE
+# -------------------------------
+
+st.subheader("Scraped Data")
+
+st.dataframe(df)
