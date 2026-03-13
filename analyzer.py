@@ -5,10 +5,10 @@ import json
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
 
 emotion_words = {
-    "joy":["happy","great","good","love"],
-    "anger":["hate","angry","rage"],
-    "fear":["fear","scared","terrified"],
-    "sadness":["sad","depressed","cry"]
+    "joy": ["happy", "great", "good", "love"],
+    "anger": ["hate", "angry", "rage"],
+    "fear": ["fear", "scared", "terrified"],
+    "sadness": ["sad", "depressed", "cry"]
 }
 
 
@@ -17,7 +17,7 @@ def extract_keywords(text):
     try:
         X = vectorizer.fit_transform([text])
         return vectorizer.get_feature_names_out().tolist()
-    except:
+    except Exception:
         return []
 
 
@@ -28,12 +28,12 @@ def detect_topics(text):
     topics = []
 
     topic_sets = {
-        "technology":["ai","software","data","cloud","python"],
-        "finance":["market","stock","crypto","money"],
-        "health":["health","medicine","doctor","fitness"]
+        "technology": ["ai", "software", "data", "cloud", "python"],
+        "finance": ["market", "stock", "crypto", "money"],
+        "health": ["health", "medicine", "doctor", "fitness"]
     }
 
-    for topic,keys in topic_sets.items():
+    for topic, keys in topic_sets.items():
         if any(k in words for k in keys):
             topics.append(topic)
 
@@ -42,7 +42,7 @@ def detect_topics(text):
 
 def emotion_analysis(text):
 
-    scores = {k:0 for k in emotion_words}
+    scores = {k: 0 for k in emotion_words}
 
     words = text.lower().split()
 
@@ -59,6 +59,9 @@ def summarize(text):
 
 
 def analyze(text):
+    """
+    Legacy simple analysis (kept for compatibility)
+    """
 
     blob = TextBlob(text)
 
@@ -82,3 +85,32 @@ def analyze(text):
         "emotions": json.dumps(emotions),
         "summary": summary
     }
+
+
+def analyze_all(text):
+    """
+    Full analysis used by main pipeline.
+    This restores functionality expected by main.py
+    """
+
+    blob = TextBlob(text)
+
+    sentiment_score = blob.sentiment.polarity
+    sentiment_label = "POSITIVE" if sentiment_score > 0 else "NEGATIVE"
+
+    keywords = extract_keywords(text)
+    topics = detect_topics(text)
+    emotions = emotion_analysis(text)
+    summary = summarize(text)
+
+    return {
+        "sentiment": {
+            "label": sentiment_label,
+            "score": sentiment_score
+        },
+        "keywords": keywords,
+        "topics": topics,
+        "summary": summary,
+        "emotions": emotions
+    }
+
