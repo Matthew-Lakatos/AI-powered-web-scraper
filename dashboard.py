@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-import json
 from collections import Counter
 
 API = "http://localhost:8000"
@@ -11,9 +10,7 @@ st.set_page_config(page_title="AI Scraper Dashboard", layout="wide")
 
 st.title("AI Web Scraper Analytics Dashboard")
 
-# Fetch data
 res = requests.get(f"{API}/results").json()
-
 data = res["results"]
 
 if not data:
@@ -24,9 +21,9 @@ df = pd.DataFrame(data)
 
 df["last_scraped"] = pd.to_datetime(df["last_scraped"])
 
-# -------------------------------
+# ----------------
 # METRICS
-# -------------------------------
+# ----------------
 
 metrics = requests.get(f"{API}/metrics").json()
 
@@ -34,13 +31,13 @@ col1, col2, col3 = st.columns(3)
 
 col1.metric("Total Records", metrics["total_records"])
 col2.metric("Unique URLs", metrics["unique_urls"])
-col3.metric("Positive Sentiment", metrics["sentiment_breakdown"].get("POSITIVE",0))
+col3.metric("Positive Sentiment", metrics["sentiment_breakdown"].get("POSITIVE", 0))
 
 st.divider()
 
-# -------------------------------
-# SENTIMENT DISTRIBUTION
-# -------------------------------
+# ----------------
+# SENTIMENT PIE
+# ----------------
 
 st.subheader("Sentiment Distribution")
 
@@ -48,14 +45,14 @@ sentiment_counts = df["sentiment"].value_counts()
 
 fig = px.pie(
     names=sentiment_counts.index,
-    values=sentiment_counts.values,
+    values=sentiment_counts.values
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
+# ----------------
 # SENTIMENT TREND
-# -------------------------------
+# ----------------
 
 st.subheader("Sentiment Trend")
 
@@ -73,9 +70,9 @@ fig = px.line(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
+# ----------------
 # SCRAPING ACTIVITY
-# -------------------------------
+# ----------------
 
 st.subheader("Scraping Activity")
 
@@ -83,33 +80,29 @@ activity = df.groupby(
     pd.Grouper(key="last_scraped", freq="H")
 ).size().reset_index(name="scrapes")
 
-fig = px.bar(
-    activity,
-    x="last_scraped",
-    y="scrapes"
-)
+fig = px.bar(activity, x="last_scraped", y="scrapes")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
-# KEYWORD ANALYTICS
-# -------------------------------
+# ----------------
+# KEYWORDS
+# ----------------
 
 st.subheader("Top Keywords")
 
 keywords = []
 
-for row in df["keywords"]:
-    if isinstance(row, list):
-        keywords.extend(row)
+for k in df["keywords"]:
+    if isinstance(k, list):
+        keywords.extend(k)
 
-kw_series = pd.Series(keywords).value_counts().head(20)
+if keywords:
+    kw_series = pd.Series(keywords).value_counts().head(20)
+    st.bar_chart(kw_series)
 
-st.bar_chart(kw_series)
-
-# -------------------------------
+# ----------------
 # TOPICS
-# -------------------------------
+# ----------------
 
 st.subheader("Topic Frequency")
 
@@ -119,13 +112,13 @@ for t in df["topics"]:
     if isinstance(t, list):
         topics.extend(t)
 
-topic_counts = pd.Series(topics).value_counts().head(15)
+if topics:
+    topic_series = pd.Series(topics).value_counts().head(15)
+    st.bar_chart(topic_series)
 
-st.bar_chart(topic_counts)
-
-# -------------------------------
-# EMOTION ANALYSIS
-# -------------------------------
+# ----------------
+# EMOTIONS
+# ----------------
 
 st.subheader("Emotion Analysis")
 
@@ -135,22 +128,20 @@ for e in df["emotions"]:
     if isinstance(e, dict):
         emotion_totals.update(e)
 
-emotion_df = pd.DataFrame(
-    emotion_totals.items(),
-    columns=["emotion","count"]
-)
+if emotion_totals:
 
-fig = px.bar(
-    emotion_df,
-    x="emotion",
-    y="count"
-)
+    emotion_df = pd.DataFrame(
+        emotion_totals.items(),
+        columns=["emotion", "count"]
+    )
 
-st.plotly_chart(fig, use_container_width=True)
+    fig = px.bar(emotion_df, x="emotion", y="count")
 
-# -------------------------------
+    st.plotly_chart(fig, use_container_width=True)
+
+# ----------------
 # DATA TABLE
-# -------------------------------
+# ----------------
 
 st.subheader("Scraped Data")
 
