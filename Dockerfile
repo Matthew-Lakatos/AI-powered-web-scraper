@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # System deps for Chrome + Selenium
 RUN apt-get update && apt-get install -y \
-    wget gnupg unzip curl \
+    wget gnupg unzip curl supervisor \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Chrome
@@ -34,7 +34,10 @@ ENV API_HOST=0.0.0.0
 ENV API_PORT=8000
 ENV DASHBOARD_PORT=8501
 
+# Copy supervisor config
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
 EXPOSE 8000
 EXPOSE 8501
 
-CMD ["bash", "-c", "uvicorn api:app --host 0.0.0.0 --port 8000"]
+CMD ["supervisord", "-n"]
