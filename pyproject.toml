@@ -20,6 +20,7 @@ dependencies = [
     "streamlit",
     "python-dotenv",
     "pydantic>=1.10"
+    "typer[all]"
 ]
 
 [project.scripts]
