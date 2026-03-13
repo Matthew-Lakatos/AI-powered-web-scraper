@@ -5,6 +5,21 @@ import json
 app = FastAPI(title="AI Web Scraper API")
 
 
+def safe_parse(value):
+
+    if value is None:
+        return []
+
+    try:
+        return json.loads(value)
+    except Exception:
+
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+
+        return value
+
+
 @app.get("/")
 def root():
     return {"status": "running"}
@@ -36,15 +51,16 @@ def get_results():
     results = []
 
     for r in rows:
+
         results.append({
             "id": r[0],
             "url": r[1],
             "sentiment": r[2],
             "score": r[3],
-            "keywords": json.loads(r[4]) if r[4] else [],
-            "topics": json.loads(r[5]) if r[5] else [],
+            "keywords": safe_parse(r[4]),
+            "topics": safe_parse(r[5]),
             "summary": r[6],
-            "emotions": json.loads(r[7]) if r[7] else {},
+            "emotions": safe_parse(r[7]),
             "last_scraped": r[8]
         })
 
@@ -55,6 +71,7 @@ def get_results():
 def get_metrics():
 
     with get_connection() as conn:
+
         cursor = conn.cursor()
 
         cursor.execute("SELECT COUNT(*) FROM sentiment_data")
