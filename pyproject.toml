@@ -1,0 +1,30 @@
+[project]
+name = "sentiment_pipeline"
+version = "0.1.0"
+description = "Asynchronous web scraper with sentiment and NLP analysis"
+authors = [{ name = "Mat" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "aiohttp",
+    "selenium",
+    "beautifulsoup4",
+    "transformers",
+    "torch",
+    "readability-lxml",
+    "keybert",
+    "sentence-transformers",
+    "fastapi",
+    "uvicorn",
+    "streamlit",
+    "python-dotenv"
+]
+
+[project.scripts]
+sentiment-api = "api:app"
+sentiment-dashboard = "dashboard:main"
+sentiment-run = "main:main"
+
+[tool.setuptools]
+packages = ["."]
