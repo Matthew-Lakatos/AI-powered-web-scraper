@@ -10,6 +10,46 @@ st.set_page_config(page_title="AI Scraper Dashboard", layout="wide")
 
 st.title("AI Web Scraper Analytics Dashboard")
 
+# -------------------------
+# USER URL INPUT
+# -------------------------
+
+st.subheader("Analyze Websites")
+
+urls = st.text_area(
+    "Enter URLs (one per line)"
+)
+
+col1, col2 = st.columns(2)
+
+if col1.button("Submit URLs"):
+
+    url_list = [u.strip() for u in urls.split("\n") if u.strip()]
+
+    if not url_list:
+        st.warning("Please enter at least one URL")
+
+    else:
+
+        response = requests.post(
+            f"{API}/analyze",
+            json={"urls": url_list}
+        )
+
+        if response.status_code == 200:
+            st.success("URLs submitted for analysis")
+
+        else:
+            st.error("Submission failed")
+
+
+if col2.button("Refresh Data"):
+    st.rerun()
+
+# -------------------------
+# LOAD DATA
+# -------------------------
+
 res = requests.get(f"{API}/results").json()
 data = res["results"]
 
@@ -21,9 +61,9 @@ df = pd.DataFrame(data)
 
 df["last_scraped"] = pd.to_datetime(df["last_scraped"])
 
-# ----------------
+# -------------------------
 # METRICS
-# ----------------
+# -------------------------
 
 metrics = requests.get(f"{API}/metrics").json()
 
@@ -35,9 +75,9 @@ col3.metric("Positive Sentiment", metrics["sentiment_breakdown"].get("POSITIVE",
 
 st.divider()
 
-# ----------------
+# -------------------------
 # SENTIMENT PIE
-# ----------------
+# -------------------------
 
 st.subheader("Sentiment Distribution")
 
@@ -50,9 +90,9 @@ fig = px.pie(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ----------------
+# -------------------------
 # SENTIMENT TREND
-# ----------------
+# -------------------------
 
 st.subheader("Sentiment Trend")
 
@@ -70,9 +110,9 @@ fig = px.line(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ----------------
+# -------------------------
 # SCRAPING ACTIVITY
-# ----------------
+# -------------------------
 
 st.subheader("Scraping Activity")
 
@@ -84,9 +124,9 @@ fig = px.bar(activity, x="last_scraped", y="scrapes")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ----------------
+# -------------------------
 # KEYWORDS
-# ----------------
+# -------------------------
 
 st.subheader("Top Keywords")
 
@@ -100,9 +140,9 @@ if keywords:
     kw_series = pd.Series(keywords).value_counts().head(20)
     st.bar_chart(kw_series)
 
-# ----------------
+# -------------------------
 # TOPICS
-# ----------------
+# -------------------------
 
 st.subheader("Topic Frequency")
 
@@ -116,9 +156,9 @@ if topics:
     topic_series = pd.Series(topics).value_counts().head(15)
     st.bar_chart(topic_series)
 
-# ----------------
+# -------------------------
 # EMOTIONS
-# ----------------
+# -------------------------
 
 st.subheader("Emotion Analysis")
 
@@ -139,9 +179,9 @@ if emotion_totals:
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ----------------
+# -------------------------
 # DATA TABLE
-# ----------------
+# -------------------------
 
 st.subheader("Scraped Data")
 
