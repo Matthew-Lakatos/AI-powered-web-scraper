@@ -1,8 +1,16 @@
-from fastapi import FastAPI
-from database import get_connection
+from fastapi import FastAPI, BackgroundTasks
+from pydantic import BaseModel
+from typing import List
 import json
 
+from database import get_connection
+from main import run_pipeline
+
 app = FastAPI(title="AI Web Scraper API")
+
+
+class URLRequest(BaseModel):
+    urls: List[str]
 
 
 def safe_parse(value):
@@ -12,6 +20,7 @@ def safe_parse(value):
 
     try:
         return json.loads(value)
+
     except Exception:
 
         if isinstance(value, str):
@@ -24,6 +33,28 @@ def safe_parse(value):
 def root():
     return {"status": "running"}
 
+
+# -------------------------
+# USER URL SUBMISSION
+# -------------------------
+
+@app.post("/analyze")
+async def analyze_urls(request: URLRequest, background_tasks: BackgroundTasks):
+
+    urls = list(set(request.urls))  # remove duplicates
+
+    background_tasks.add_task(run_pipeline, urls)
+
+    return {
+        "status": "submitted",
+        "urls": urls,
+        "message": "URLs added to analysis queue"
+    }
+
+
+# -------------------------
+# RESULTS
+# -------------------------
 
 @app.get("/results")
 def get_results():
@@ -66,6 +97,10 @@ def get_results():
 
     return {"results": results}
 
+
+# -------------------------
+# METRICS
+# -------------------------
 
 @app.get("/metrics")
 def get_metrics():
