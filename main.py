@@ -1,14 +1,17 @@
 import asyncio
 import logging
 from typing import List
+from datetime import datetime
 
 from scraper import scrape_all_urls
 from analyzer import analyze_all
 from database import create_db, get_connection, save_many_to_db
+from cache import is_cache_valid, update_last_scraped
+from config import settings
 
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=settings.log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -23,7 +26,20 @@ URLS: List[str] = [
 
 async def run_pipeline(urls: List[str]) -> None:
     logger.info("Starting scraping pipeline")
-    scraped_data = await scrape_all_urls(urls)
+
+    urls_to_scrape = []
+    for url in urls:
+        if is_cache_valid(url):
+            logger.info(f"Skipping (cached): {url}")
+        else:
+            urls_to_scrape.append(url)
+
+    # If everything is cached, nothing to scrape
+    if not urls_to_scrape:
+        logger.info("All URLs are cached. Nothing to scrape.")
+        return
+
+    scraped_data = await scrape_all_urls(urls_to_scrape)
 
     rows_to_insert = []
     for item in scraped_data:
@@ -31,24 +47,41 @@ async def run_pipeline(urls: List[str]) -> None:
         text = item.get("text", "") or ""
 
         full_analysis = analyze_all(text)
+
         sentiment = full_analysis["sentiment"]
         sentiment_label = sentiment["label"]
         sentiment_score = sentiment["score"]
 
+        keywords = full_analysis["keywords"]
+        topics = full_analysis["topics"]
+        summary = full_analysis["summary"]
+        emotions = full_analysis["emotions"]
+
         logger.info(
             f"URL: {url} | Sentiment: {sentiment_label} ({sentiment_score:.3f}) "
-            f"| Topics: {full_analysis['topics']} "
-            f"| Keywords: {full_analysis['keywords']}"
+            f"| Topics: {topics} | Keywords: {keywords}"
         )
 
-        # DB schema unchanged: store sentiment + raw text
-        rows_to_insert.append((url, sentiment_label, sentiment_score, text))
-
-        # If you later extend DB, you can also store summary, topics, etc.
+        # Store everything in the database
+        rows_to_insert.append((
+            url,
+            sentiment_label,
+            sentiment_score,
+            text,
+            ", ".join(keywords),
+            ", ".join(topics),
+            summary,
+            str(emotions),
+            datetime.utcnow().isoformat()
+        ))
 
     create_db()
     with get_connection() as conn:
         save_many_to_db(conn, rows_to_insert)
+
+        # Update last_scraped timestamps
+        for row in rows_to_insert:
+            update_last_scraped(conn, row[0])
 
     logger.info("Pipeline completed and data saved to database.")
 
