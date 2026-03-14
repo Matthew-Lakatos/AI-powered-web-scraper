@@ -3,6 +3,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 import sys
+import json
 
 from crawler import crawl
 from discovery import discover_urls
@@ -14,16 +15,19 @@ from config import settings
 from logging_config import setup_logging
 from monitor import Monitor, Timer
 
+from embeddings import generate_embedding
+from credibility import credibility_score
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_URLS: List[str] = [
+DEFAULT_URLS = [
     "https://en.wikipedia.org/wiki/Artificial_intelligence",
     "https://www.bbc.com/news/technology",
     "https://www.theverge.com/tech",
 ]
+
 
 async def run_discovery(topic, max_pages=50):
 
@@ -34,85 +38,95 @@ async def run_discovery(topic, max_pages=50):
     await run_pipeline(crawled)
 
 
-async def run_pipeline(
-    urls: List[str],
-    monitor: Optional[Monitor] = None
-) -> None:
+async def run_pipeline(urls: List[str], monitor: Optional[Monitor] = None):
 
     if monitor is None:
         monitor = Monitor()
 
     logger.info("Starting scraping pipeline")
 
-    # remove duplicates
     urls = list(set(urls))
 
-    # Step 1 — caching
     urls_to_scrape = []
 
     for url in urls:
 
         if is_cache_valid(url):
+
             logger.info(f"Skipping (cached): {url}")
+
             monitor.record_cached()
 
         else:
+
             urls_to_scrape.append(url)
 
     if not urls_to_scrape:
 
-        logger.info("All URLs cached.")
-        logger.info(f"Monitor summary: {monitor.summary()}")
+        logger.info("All URLs cached")
+
         return
 
-    # Step 2 — scrape
     with Timer() as t_scrape:
+
         scraped_data = await scrape_all_urls(urls_to_scrape)
 
     monitor.record_scrape(t_scrape.duration)
 
-    # Step 3 — analyze
     rows_to_insert = []
 
     for item in scraped_data:
 
         url = item["url"]
+
         text = item.get("text", "") or ""
 
         with Timer() as t_nlp:
-            full_analysis = analyze_all(text)
+
+            analysis = analyze_all(text)
 
         monitor.record_nlp(t_nlp.duration)
 
-        sentiment = full_analysis["sentiment"]
+        sentiment = analysis["sentiment"]
 
-        sentiment_label = sentiment["label"]
-        sentiment_score = sentiment["score"]
+        keywords = analysis["keywords"]
 
-        keywords = full_analysis["keywords"]
-        topics = full_analysis["topics"]
-        summary = full_analysis["summary"]
-        emotions = full_analysis["emotions"]
+        topics = analysis["topics"]
 
-        logger.info(
-            f"{url} | Sentiment: {sentiment_label} ({sentiment_score:.3f})"
-        )
+        summary = analysis["summary"]
+
+        emotions = analysis["emotions"]
+
+        embedding = generate_embedding(summary or text[:1000])
+
+        credibility = credibility_score(url)
 
         rows_to_insert.append((
 
             url,
-            sentiment_label,
-            sentiment_score,
+
+            sentiment["label"],
+
+            sentiment["score"],
+
             text,
-            ", ".join(keywords),
-            ", ".join(topics),
+
+            json.dumps(keywords),
+
+            json.dumps(topics),
+
             summary,
-            str(emotions),
+
+            json.dumps(emotions),
+
+            json.dumps(embedding),
+
+            credibility,
+
             datetime.utcnow().isoformat()
 
         ))
 
-    # Step 4 — DB
     create_db()
 
     with get_connection() as conn:
@@ -120,10 +134,10 @@ async def run_pipeline(
         save_many_to_db(conn, rows_to_insert)
 
         for row in rows_to_insert:
+
             update_last_scraped(conn, row[0])
 
     logger.info("Pipeline completed")
-    logger.info(f"Monitor summary: {monitor.summary()}")
 
 
 def main():
@@ -131,6 +145,7 @@ def main():
     urls = DEFAULT_URLS
 
     if len(sys.argv) > 1:
+
         urls = sys.argv[1:]
 
     asyncio.run(run_pipeline(urls))
