@@ -4,6 +4,7 @@ from credibility import compute_credibility
 from embeddings import generate_embedding
 from narrative_engine import engine
 from knowledge_graph import build_graph
+from target_profiles import TARGETS
 import json
 
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
@@ -55,6 +56,24 @@ def emotion_analysis(text):
         scores[emotion] = sum(1 for w in words if w in vocab)
 
     return scores
+
+
+def detect_targets(text):
+
+    matches = []
+
+    lower = text.lower()
+
+    for target in TARGETS:
+
+        for keyword in target["keywords"]:
+
+            if keyword.lower() in lower:
+
+                matches.append(target["name"])
+                break
+
+    return matches
 
 
 def summarize(text):
