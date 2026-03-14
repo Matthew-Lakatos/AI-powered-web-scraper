@@ -4,9 +4,8 @@ from credibility import compute_credibility
 from embeddings import generate_embedding
 from narrative_engine import engine
 from knowledge_graph import build_graph
-from target_profiles import TARGETS
+from target_profiles import detect_targets
 from claim_extraction import extract_claims
-from target_profiles import TARGETS
 from knowledge_graph import link_entity_topic
 from target_detection import detect_targets
 import json
