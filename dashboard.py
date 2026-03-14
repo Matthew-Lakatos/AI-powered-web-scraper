@@ -72,6 +72,19 @@ if st.button("Start Crawl"):
 
     st.success("Crawler started")
 
+st.subheader("Semantic Search")
+
+query = st.text_input("Search meaning (not keywords)")
+
+if query:
+
+    res = requests.get(
+        f"{API}/semantic-search",
+        params={"query": query}
+    ).json()
+
+    st.write(res)
+
 # -------------------------
 # LOAD DATA
 # -------------------------
