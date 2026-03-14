@@ -1,15 +1,19 @@
 from textblob import TextBlob
 from sklearn.feature_extraction.text import CountVectorizer
 from credibility import compute_credibility
+from embeddings import generate_embedding
+from narrative_engine import engine
+from knowledge_graph import build_graph
 import json
 
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
 
+
 emotion_words = {
     "joy": ["happy", "great", "good", "love"],
     "anger": ["hate", "angry", "rage"],
-    "fear": ["fear", "scared", "terrified"],
-    "sadness": ["sad", "depressed", "cry"]
+    "fear": ["fear", "scared"],
+    "sadness": ["sad", "cry"]
 }
 
 
@@ -26,17 +30,17 @@ def detect_topics(text):
 
     words = text.lower().split()
 
-    topics = []
-
     topic_sets = {
-        "technology": ["ai", "software", "data", "cloud", "python"],
-        "finance": ["market", "stock", "crypto", "money"],
-        "health": ["health", "medicine", "doctor", "fitness"]
+        "technology": ["ai", "software", "data", "cloud"],
+        "finance": ["market", "stock", "crypto"],
+        "health": ["health", "medicine"]
     }
 
-    for topic, keys in topic_sets.items():
+    topics = []
+
+    for t, keys in topic_sets.items():
         if any(k in words for k in keys):
-            topics.append(topic)
+            topics.append(t)
 
     return topics
 
@@ -56,13 +60,11 @@ def emotion_analysis(text):
 def summarize(text):
 
     sentences = text.split(".")
+
     return ".".join(sentences[:2])
 
 
-def analyze(text):
-    """
-    Legacy simple analysis (kept for compatibility)
-    """
+def analyze(text, url):
 
     blob = TextBlob(text)
 
@@ -80,41 +82,20 @@ def analyze(text):
 
     credibility = compute_credibility(url, text)
 
+    embedding = generate_embedding(summary)
+
+    narrative_id = engine.add_article(text, summary)
+
+    build_graph(topics, keywords)
+
     return {
         "sentiment": sentiment,
         "score": score,
         "keywords": json.dumps(keywords),
         "topics": json.dumps(topics),
+        "summary": summary,
         "emotions": json.dumps(emotions),
-        "summary": summary,
-        "credibility": credibility
+        "embedding": json.dumps(embedding),
+        "credibility": credibility,
+        "narrative_id": narrative_id
     }
-
-
-def analyze_all(text):
-    """
-    Full analysis used by main pipeline.
-    This restores functionality expected by main.py
-    """
-
-    blob = TextBlob(text)
-
-    sentiment_score = blob.sentiment.polarity
-    sentiment_label = "POSITIVE" if sentiment_score > 0 else "NEGATIVE"
-
-    keywords = extract_keywords(text)
-    topics = detect_topics(text)
-    emotions = emotion_analysis(text)
-    summary = summarize(text)
-
-    return {
-        "sentiment": {
-            "label": sentiment_label,
-            "score": sentiment_score
-        },
-        "keywords": keywords,
-        "topics": topics,
-        "summary": summary,
-        "emotions": emotions
-    }
-
