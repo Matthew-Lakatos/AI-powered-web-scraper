@@ -2,6 +2,20 @@ from url_queue import URLQueue
 from link_extractor import extract_links
 from crawl_rules import is_content_url
 from scraper import fetch_html
+import asyncio
+
+
+async def discover_urls(query):
+
+    # use existing search logic
+    urls = []
+
+    try:
+        urls = await search(query)
+    except Exception:
+        pass
+
+    return urls
 
 
 async def crawl(seed_urls, max_pages=50, content_only=False):
