@@ -59,6 +59,19 @@ if st.button("Discover and Analyze"):
 
     st.success("Discovery started")
 
+st.subheader("Website Crawl")
+
+crawl_url = st.text_input("Seed URL")
+
+if st.button("Start Crawl"):
+
+    requests.post(
+        f"{API}/crawl",
+        params={"url": crawl_url}
+    )
+
+    st.success("Crawler started")
+
 # -------------------------
 # LOAD DATA
 # -------------------------
