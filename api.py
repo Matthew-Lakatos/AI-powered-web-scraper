@@ -3,6 +3,9 @@ from pydantic import BaseModel
 from typing import List
 import json
 
+from discovery import discover_urls
+from fastapi import BackgroundTasks
+from crawler import crawl
 from database import get_connection
 from main import run_pipeline
 
@@ -51,6 +54,31 @@ async def analyze_urls(request: URLRequest, background_tasks: BackgroundTasks):
         "message": "URLs added to analysis queue"
     }
 
+@app.post("/discover")
+async def discover_topic(topic: str, background_tasks: BackgroundTasks):
+
+    urls = discover_urls(topic)
+
+    background_tasks.add_task(run_pipeline, urls)
+
+    return {
+        "topic": topic,
+        "discovered_urls": urls[:10],
+        "status": "submitted"
+    }
+
+@app.post("/crawl")
+async def crawl_site(url: str, background_tasks: BackgroundTasks):
+
+    async def task():
+
+        urls = await crawl([url], max_pages=50)
+
+        await run_pipeline(urls)
+
+    background_tasks.add_task(task)
+
+    return {"status": "crawl started"}
 
 # -------------------------
 # RESULTS
