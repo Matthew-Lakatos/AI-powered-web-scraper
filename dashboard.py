@@ -46,6 +46,19 @@ if col1.button("Submit URLs"):
 if col2.button("Refresh Data"):
     st.rerun()
 
+st.subheader("Global Discovery")
+
+topic = st.text_input("Topic")
+
+if st.button("Discover and Analyze"):
+
+    requests.post(
+        f"{API}/discover",
+        params={"topic": topic}
+    )
+
+    st.success("Discovery started")
+
 # -------------------------
 # LOAD DATA
 # -------------------------
