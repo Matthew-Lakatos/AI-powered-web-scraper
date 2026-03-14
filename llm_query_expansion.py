@@ -7,24 +7,35 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def generate_queries(topic):
 
     prompt = f"""
-Generate 10 diverse search queries related to:
+Generate 10 search engine queries related to:
 
 {topic}
 
-Include policy debates, criticism, innovation,
-economic impact, and future outlook.
+Include:
+- policy debates
+- economic impact
+- criticism
+- technological innovation
+- future outlook
 """
 
     try:
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
 
-        queries = response.choices[0].message.content.split("\n")
+        lines = response.choices[0].message.content.split("\n")
 
-        return [q.strip("- ") for q in queries if q]
+        queries = []
+
+        for line in lines:
+            line = line.strip("- ").strip()
+            if line:
+                queries.append(line)
+
+        return queries
 
     except Exception:
         return [topic]
