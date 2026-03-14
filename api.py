@@ -8,8 +8,11 @@ from fastapi import BackgroundTasks
 from crawler import crawl
 from database import get_connection
 from main import run_pipeline
+from embeddings import generate_embedding
+from vector_store import VectorStore
 
 app = FastAPI(title="AI Web Scraper API")
+vector_store = VectorStore()
 
 
 class URLRequest(BaseModel):
@@ -79,6 +82,15 @@ async def crawl_site(url: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(task)
 
     return {"status": "crawl started"}
+
+@app.get("/semantic-search")
+def semantic_search(query: str):
+
+    emb = generate_embedding(query)
+
+    results = vector_store.search(emb)
+
+    return {"results": results}
 
 # -------------------------
 # RESULTS
