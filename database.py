@@ -22,50 +22,39 @@ def create_db():
         cursor = conn.cursor()
 
         cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS sentiment_data (
+        """
+        CREATE TABLE IF NOT EXISTS sentiment_data (
 
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                url TEXT,
+            url TEXT,
 
-                sentiment TEXT,
+            sentiment TEXT,
 
-                score REAL,
+            score REAL,
 
-                text TEXT,
+            text TEXT,
 
-                keywords TEXT,
+            keywords TEXT,
 
-                topics TEXT,
+            topics TEXT,
 
-                summary TEXT,
+            summary TEXT,
 
-                emotions TEXT,
+            emotions TEXT,
 
-                embedding TEXT,
+            embedding TEXT,
 
-                credibility REAL,
+            credibility REAL,
 
-                last_scraped TIMESTAMP
-            )
-            """
+            last_scraped TIMESTAMP
+        )
+        """
         )
 
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_url ON sentiment_data(url)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sentiment ON sentiment_data(sentiment)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_credibility ON sentiment_data(credibility)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_time ON sentiment_data(last_scraped)")
+
         conn.commit()
-
-
-def save_many_to_db(conn, rows):
-
-    cursor = conn.cursor()
-
-    cursor.executemany(
-        """
-        INSERT INTO sentiment_data
-        (url,sentiment,score,text,keywords,topics,summary,emotions,embedding,credibility,last_scraped)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
-        """,
-        rows
-    )
-
-    conn.commit()
