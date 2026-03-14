@@ -1,20 +1,38 @@
-from collections import defaultdict
+import networkx as nx
 
-graph = defaultdict(set)
-
-
-def add_relationship(topic, keyword):
-
-    graph[topic].add(keyword)
+graph = nx.Graph()
 
 
-def build_graph(topics, keywords):
+def add_entity(entity):
 
-    for t in topics:
-        for k in keywords:
-            add_relationship(t, k)
+    graph.add_node(entity, type="entity")
 
 
-def get_graph():
+def add_topic(topic):
 
-    return {k: list(v) for k, v in graph.items()}
+    graph.add_node(topic, type="topic")
+
+
+def add_narrative(narrative):
+
+    graph.add_node(narrative, type="narrative")
+
+
+def link_entity_topic(entity, topic):
+
+    graph.add_edge(entity, topic, relation="discusses")
+
+
+def link_topic_narrative(topic, narrative):
+
+    graph.add_edge(topic, narrative, relation="forms")
+
+
+def link_narrative_source(narrative, source):
+
+    graph.add_edge(narrative, source, relation="reported_by")
+
+
+def get_neighbors(node):
+
+    return list(graph.neighbors(node))
