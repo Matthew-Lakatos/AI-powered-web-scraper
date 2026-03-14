@@ -5,6 +5,10 @@ from embeddings import generate_embedding
 from narrative_engine import engine
 from knowledge_graph import build_graph
 from target_profiles import TARGETS
+from claim_extraction import extract_claims
+from target_profiles import TARGETS
+from knowledge_graph import link_entity_topic
+from target_detection import detect_targets
 import json
 
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
@@ -102,6 +106,10 @@ def analyze(text, url):
     credibility = compute_credibility(url, text)
 
     embedding = generate_embedding(summary)
+
+    targets = detect_targets(article_text)
+
+    claims = extract_claims(article_text)
 
     narrative_id = engine.add_article(text, summary)
 
