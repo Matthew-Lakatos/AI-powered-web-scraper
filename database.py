@@ -52,6 +52,24 @@ def create_db():
         """
         )
 
+        cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS narratives (
+            id INTEGER PRIMARY KEY,
+            description TEXT
+        )
+        """
+        )
+        
+        cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS knowledge_graph (
+            topic TEXT,
+            keyword TEXT
+        )
+        """
+        )
+
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_url ON sentiment_data(url)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sentiment ON sentiment_data(sentiment)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_credibility ON sentiment_data(credibility)")
