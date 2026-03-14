@@ -3,7 +3,7 @@ TARGETS = [
         "name": "Apple",
         "type": "company",
         "industry": "technology",
-        "keywords": ["Apple", "iPhone", "Apple AI", "Tim Cook"]
+        "keywords": ["Apple", "iPhone", "Tim Cook"]
     },
     {
         "name": "NVIDIA",
@@ -27,7 +27,7 @@ TARGETS = [
         "name": "Google",
         "type": "company",
         "industry": "technology",
-        "keywords": ["Google", "Alphabet", "Google AI", "Gemini"]
+        "keywords": ["Google", "Alphabet", "Gemini AI"]
     },
     {
         "name": "Microsoft",
@@ -40,20 +40,19 @@ TARGETS = [
         "type": "technology",
         "industry": "AI",
         "keywords": ["OpenAI", "ChatGPT", "GPT models"]
-    },
-    {
-        "name": "China",
-        "type": "country",
-        "keywords": ["China policy", "Chinese government"]
-    },
-    {
-        "name": "Iran",
-        "type": "country",
-        "keywords": ["Iran war", "Iran trade"]
-    },
-    {
-        "name": "European Union",
-        "type": "government",
-        "keywords": ["EU policy", "EU regulation"]
     }
 ]
+
+
+def detect_targets(text):
+
+    text_lower = text.lower()
+    matches = []
+
+    for target in TARGETS:
+        for keyword in target["keywords"]:
+            if keyword.lower() in text_lower:
+                matches.append(target["name"])
+                break
+
+    return matches
