@@ -109,10 +109,14 @@ def analyze(text, url):
     targets = detect_targets(article_text)
 
     claims = extract_claims(article_text)
+    
+    analysis["targets"] = targets
+    analysis["claims"] = claims
 
     narrative_id = engine.add_article(text, summary)
 
-    build_graph(topics, keywords)
+    for t in targets:
+        link_entity_topic(t, analysis.get("topic", "unknown"))
 
     return {
         "sentiment": sentiment,
