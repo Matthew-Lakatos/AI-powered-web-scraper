@@ -1,10 +1,9 @@
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import json
 
 from discovery import discover_urls
-from fastapi import BackgroundTasks
 from crawler import crawl
 from database import get_connection
 from main import run_pipeline
@@ -12,12 +11,27 @@ from embeddings import generate_embedding
 from vector_store import VectorStore
 
 app = FastAPI(title="AI Web Scraper API")
+
+# persistent vector store
 vector_store = VectorStore()
 
+
+# -------------------------
+# REQUEST MODELS
+# -------------------------
 
 class URLRequest(BaseModel):
     urls: List[str]
 
+
+class SemanticQuery(BaseModel):
+    query: str
+    k: Optional[int] = 5
+
+
+# -------------------------
+# HELPERS
+# -------------------------
 
 def safe_parse(value):
 
@@ -34,6 +48,10 @@ def safe_parse(value):
 
         return value
 
+
+# -------------------------
+# ROOT
+# -------------------------
 
 @app.get("/")
 def root():
@@ -57,6 +75,7 @@ async def analyze_urls(request: URLRequest, background_tasks: BackgroundTasks):
         "message": "URLs added to analysis queue"
     }
 
+
 @app.post("/discover")
 async def discover_topic(topic: str, background_tasks: BackgroundTasks):
 
@@ -70,6 +89,7 @@ async def discover_topic(topic: str, background_tasks: BackgroundTasks):
         "status": "submitted"
     }
 
+
 @app.post("/crawl")
 async def crawl_site(url: str, background_tasks: BackgroundTasks):
 
@@ -77,22 +97,41 @@ async def crawl_site(url: str, background_tasks: BackgroundTasks):
 
         urls = await crawl([url], max_pages=50)
 
-        await run_pipeline(urls)
+        # run pipeline on discovered pages
+        run_pipeline(urls)
 
     background_tasks.add_task(task)
 
     return {"status": "crawl started"}
 
 
+# -------------------------
+# SEMANTIC SEARCH
+# -------------------------
 
-class SemanticQuery(BaseModel):
-    query: str
-    k: int = 5
+@app.get("/semantic-search")
+def semantic_search(query: str, k: int = 5):
+
+    embedding = generate_embedding(query)
+
+    if embedding is None:
+        return {"results": []}
+
+    results = vector_store.search(embedding, k)
+
+    return {
+        "query": query,
+        "results": results
+    }
+
 
 @app.post("/semantic-search")
-def semantic_search(request: SemanticQuery):
+def semantic_search_post(request: SemanticQuery):
 
     embedding = generate_embedding(request.query)
+
+    if embedding is None:
+        return {"results": []}
 
     results = vector_store.search(embedding, request.k)
 
@@ -100,6 +139,8 @@ def semantic_search(request: SemanticQuery):
         "query": request.query,
         "results": results
     }
+
+
 # -------------------------
 # RESULTS
 # -------------------------
@@ -120,6 +161,7 @@ def get_results():
             topics,
             summary,
             emotions,
+            credibility,
             last_scraped
         FROM sentiment_data
         ORDER BY last_scraped DESC
@@ -140,7 +182,8 @@ def get_results():
             "topics": safe_parse(r[5]),
             "summary": r[6],
             "emotions": safe_parse(r[7]),
-            "last_scraped": r[8]
+            "credibility": r[8],
+            "last_scraped": r[9]
         })
 
     return {"results": results}
