@@ -16,3 +16,6 @@ selenium
 webdriver-manager
 python-dotenv
 tqdm
+sentence-transformers
+faiss-cpu
+tldextract
