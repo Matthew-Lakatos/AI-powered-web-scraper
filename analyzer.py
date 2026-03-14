@@ -1,5 +1,6 @@
 from textblob import TextBlob
 from sklearn.feature_extraction.text import CountVectorizer
+from credibility import compute_credibility
 import json
 
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
@@ -77,13 +78,16 @@ def analyze(text):
 
     summary = summarize(text)
 
+    credibility = compute_credibility(url, text)
+
     return {
         "sentiment": sentiment,
         "score": score,
         "keywords": json.dumps(keywords),
         "topics": json.dumps(topics),
         "emotions": json.dumps(emotions),
-        "summary": summary
+        "summary": summary,
+        "credibility": credibility
     }
 
 
