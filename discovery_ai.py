@@ -1,3 +1,7 @@
+from topic_expansion import expand_topic
+from llm_query_expansion import generate_queries
+
+
 EXPANSIONS = {
 
     "ai": [
@@ -13,6 +17,17 @@ EXPANSIONS = {
         "global economic policy"
     ]
 }
+
+
+def build_queries(topic):
+
+    queries = []
+
+    queries.extend(expand_topic(topic))
+
+    queries.extend(generate_queries(topic))
+
+    return list(set(queries))
 
 
 def expand_topic(topic):
