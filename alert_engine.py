@@ -25,7 +25,7 @@ def sentiment_shift(current, previous):
     return False
 
 
-def check_alert(narrative):
+def evaluate_narrative(narrative):
 
     alerts = []
 
@@ -34,7 +34,7 @@ def check_alert(narrative):
 
     if sentiment_shift(
         narrative["sentiment"],
-        narrative.get("previous_sentiment")
+        narrative.get("previous_sentiment"),
     ):
         alerts.append("Sentiment shift detected")
 
