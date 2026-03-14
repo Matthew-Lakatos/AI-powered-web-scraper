@@ -3,6 +3,8 @@ import numpy as np
 import pickle
 import os
 from threading import Lock
+from embeddings import generate_embedding
+
 
 INDEX_PATH = "faiss.index"
 META_PATH = "faiss_meta.pkl"
@@ -64,3 +66,10 @@ class VectorStore:
                 results.append(self.metadata[idx])
 
         return results
+
+    def store_embedding(text, metadata=None):
+    
+        vector = generate_embedding(text)
+    
+        # existing vector db storage logic
+        save_vector(vector, metadata)
