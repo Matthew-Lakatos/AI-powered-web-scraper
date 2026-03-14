@@ -25,14 +25,9 @@ def link_entity_topic(entity, topic):
 
 def link_topic_narrative(topic, narrative):
 
-    graph.add_edge(topic, narrative, relation="forms")
+    graph.add_edge(topic, narrative, relation="creates")
 
 
 def link_narrative_source(narrative, source):
 
     graph.add_edge(narrative, source, relation="reported_by")
-
-
-def get_neighbors(node):
-
-    return list(graph.neighbors(node))
