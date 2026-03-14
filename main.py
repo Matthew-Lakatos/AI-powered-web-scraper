@@ -4,6 +4,8 @@ from typing import List, Optional
 from datetime import datetime
 import sys
 
+from crawler import crawl
+from discovery import discover_urls
 from scraper import scrape_all_urls
 from analyzer import analyze_all
 from database import create_db, get_connection, save_many_to_db
@@ -22,6 +24,14 @@ DEFAULT_URLS: List[str] = [
     "https://www.bbc.com/news/technology",
     "https://www.theverge.com/tech",
 ]
+
+async def run_discovery(topic, max_pages=50):
+
+    urls = discover_urls(topic)
+
+    crawled = await crawl(urls, max_pages=max_pages)
+
+    await run_pipeline(crawled)
 
 
 async def run_pipeline(
