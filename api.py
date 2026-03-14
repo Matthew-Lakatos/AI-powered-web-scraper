@@ -83,15 +83,23 @@ async def crawl_site(url: str, background_tasks: BackgroundTasks):
 
     return {"status": "crawl started"}
 
-@app.get("/semantic-search")
-def semantic_search(query: str):
 
-    emb = generate_embedding(query)
 
-    results = vector_store.search(emb)
+class SemanticQuery(BaseModel):
+    query: str
+    k: int = 5
 
-    return {"results": results}
+@app.post("/semantic-search")
+def semantic_search(request: SemanticQuery):
 
+    embedding = generate_embedding(request.query)
+
+    results = vector_store.search(embedding, request.k)
+
+    return {
+        "query": request.query,
+        "results": results
+    }
 # -------------------------
 # RESULTS
 # -------------------------
