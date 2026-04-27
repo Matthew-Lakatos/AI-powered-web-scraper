@@ -97,8 +97,8 @@ async def crawl_site(url: str, background_tasks: BackgroundTasks):
 
         urls = await crawl([url], max_pages=50)
 
-        # run pipeline on discovered pages
-        run_pipeline(urls)
+        # FIX: run_pipeline is a coroutine — must be awaited
+        await run_pipeline(urls)
 
     background_tasks.add_task(task)
 
@@ -162,6 +162,8 @@ def get_results():
             summary,
             emotions,
             credibility,
+            propaganda_score,
+            propaganda_flags,
             last_scraped
         FROM sentiment_data
         ORDER BY last_scraped DESC
@@ -174,16 +176,18 @@ def get_results():
     for r in rows:
 
         results.append({
-            "id": r[0],
-            "url": r[1],
-            "sentiment": r[2],
-            "score": r[3],
-            "keywords": safe_parse(r[4]),
-            "topics": safe_parse(r[5]),
-            "summary": r[6],
-            "emotions": safe_parse(r[7]),
-            "credibility": r[8],
-            "last_scraped": r[9]
+            "id":               r[0],
+            "url":              r[1],
+            "sentiment":        r[2],
+            "score":            r[3],
+            "keywords":         safe_parse(r[4]),
+            "topics":           safe_parse(r[5]),
+            "summary":          r[6],
+            "emotions":         safe_parse(r[7]),
+            "credibility":      r[8],
+            "propaganda_score": r[9],
+            "propaganda_flags": safe_parse(r[10]),
+            "last_scraped":     r[11],
         })
 
     return {"results": results}
