@@ -3,11 +3,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 from credibility import compute_credibility
 from embeddings import generate_embedding
 from narrative_engine import engine
-from knowledge_graph import build_graph
 from target_profiles import detect_targets
 from claim_extraction import extract_claims
 from knowledge_graph import link_entity_topic
-from target_detection import detect_targets
 import json
 
 vectorizer = CountVectorizer(stop_words="english", max_features=10)
@@ -85,6 +83,10 @@ def summarize(text):
 
     return ".".join(sentences[:2])
 
+def analyze_all(text):
+
+    # NEEDS FUNCTIONALITY
+    return;
 
 def analyze(text, url):
 
