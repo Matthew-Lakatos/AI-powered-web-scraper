@@ -2,7 +2,7 @@ import typer
 import subprocess
 import asyncio
 
-from main import run_pipeline, URLS
+from main import run_pipeline, DEFAULT_URLS
 from config import settings
 
 app = typer.Typer(help="Sentiment & NLP pipeline CLI")
@@ -11,7 +11,7 @@ app = typer.Typer(help="Sentiment & NLP pipeline CLI")
 @app.command()
 def run(urls: list[str] = typer.Argument(None)):
     if not urls:
-        urls_to_use = URLS
+        urls_to_use = DEFAULT_URLS
     else:
         urls_to_use = urls
 
