@@ -8,6 +8,7 @@ openai
 plotly
 textblob
 scikit-learn
+yfinance
 keybert
 beautifulsoup4
 lxml
