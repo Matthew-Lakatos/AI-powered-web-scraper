@@ -1,100 +1,159 @@
-import asyncio
-import time
+"""
+auto_explorer.py
+----------------
+Autonomous exploration loop: iterates over tracked target profiles,
+discovers URLs via AI-expanded queries, scrapes and analyses each page,
+feeds results into the narrative engine and vector store, and fires
+alerts when significant patterns are detected.
 
-from target_profiles import TARGETS
-from discovery_ai import build_queries
-from discovery import discover_urls
-from scraper import scrape_all_urls
-from analyzer import analyze_all
-from narrative_engine import engine
-from knowledge_graph import link_entity_topic
-from vector_store import VectorStore
+Fix log
+-------
+- asyncio.sleep() replaces time.sleep() so the event loop is not blocked.
+- scrape_all_urls() replaces the non-existent scrape_page().
+- analyze_all() replaces the non-existent analyze_text().
+- engine.add_article() replaces the non-existent update_narratives().
+- generate_embedding() is imported at module level (was inside method body).
+- analyze_all() now receives the source URL for credibility scoring.
+- analysis["sentiment"] is accessed as a dict {"label", "score"} to match
+  the fixed analyzer.py return structure.
+"""
+
+import asyncio
+import logging
+
 from alert_engine import evaluate_narrative
-from embeddings import generate_embedding  # FIX: was imported inside method body
+from analyzer import analyze_all
+from discovery import discover_urls
+from discovery_ai import build_queries
+from embeddings import generate_embedding
+from knowledge_graph import link_entity_topic
+from narrative_engine import engine
+from scraper import scrape_all_urls
+from target_profiles import TARGETS
+from vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 _vector_store = VectorStore()
 
 
 class AutonomousExplorer:
 
-    def __init__(self):
-        self.visited_urls = set()
-        self.discovered_topics = set()
+    def __init__(self) -> None:
+        self.visited_urls: set[str] = set()
+        self.discovered_topics: set[str] = set()
 
-    async def explore_target(self, target):
+    # ------------------------------------------------------------------
+    # Target iteration
+    # ------------------------------------------------------------------
 
+    async def explore_target(self, target: dict) -> None:
         name = target["name"]
-        print(f"Exploring target: {name}")
+        logger.info("Exploring target: %s", name)
 
         queries = build_queries(name)
 
         for query in queries:
-            urls = discover_urls(query)           # sync function from discovery.py
+            urls = discover_urls(query)          # sync helper from discovery.py
             for url in urls:
                 if url in self.visited_urls:
                     continue
                 self.visited_urls.add(url)
                 await self.process_url(url, name)
 
-    async def process_url(self, url, target_name):
+    # ------------------------------------------------------------------
+    # Single-URL processing
+    # ------------------------------------------------------------------
 
+    async def process_url(self, url: str, target_name: str) -> None:
         try:
-            # FIX: scrape_page did not exist — use scrape_all_urls and take first result
+            # FIX: scrape_page() did not exist — use scrape_all_urls() and
+            # take the first result.  use_dynamic_fallback=False keeps the
+            # explorer fast; Selenium fallback is reserved for main pipeline.
             results = await scrape_all_urls([url], use_dynamic_fallback=False)
             page = results[0] if results else None
 
             if not page or not page.get("text"):
                 return
 
-            text = page["text"]
+            text: str = page["text"]
 
-            # FIX: was analyze_text — correct name is analyze_all
-            analysis = analyze_all(text)
+            # FIX: analyze_text() did not exist — correct name is analyze_all().
+            # Pass url so credibility scoring inside analyzer has context.
+            analysis = analyze_all(text, url=url)
 
-            # FIX: generate_embedding now imported at module top level
+            # ---- Vector store ---------------------------------------- #
+            # FIX: generate_embedding() was imported inside the method body;
+            # it is now imported at module level.
             embedding = generate_embedding(text[:500])
             if embedding:
                 _vector_store.add(embedding, {"url": url})
 
-            # FIX: update_narratives did not exist — use engine.add_article directly
+            # ---- Narrative engine ------------------------------------ #
+            # FIX: update_narratives() did not exist — use engine.add_article().
             summary = analysis.get("summary", "")
             narrative_id = engine.add_article(text, summary)
 
-            narrative = {
-                "current_count": 1,
-                "history": [],
-                "sentiment": analysis["sentiment"]["score"],
+            # ---- Alert evaluation ------------------------------------ #
+            # FIX: analysis["sentiment"] is now a dict {"label", "score"};
+            # access .score via the "score" key.
+            narrative_payload = {
+                "current_count":      1,
+                "history":            [],
+                "sentiment":          analysis["sentiment"]["score"],
                 "previous_sentiment": None,
             }
 
-            topic = analysis["topics"][0] if analysis.get("topics") else None
-            if topic:
-                link_entity_topic(target_name, topic)
-
-            alerts = evaluate_narrative(narrative)
+            alerts = evaluate_narrative(narrative_payload)
             if alerts:
-                print(f"ALERT for {url}: {alerts}")
+                logger.warning("ALERT for %s: %s", url, alerts)
 
-            self.expand_topics(analysis)
+            # ---- Knowledge graph links ------------------------------- #
+            topics = analysis.get("topics", [])
+            if topics:
+                link_entity_topic(target_name, topics[0])
 
-        except Exception as e:
-            print("Explorer error:", e)
+            # ---- Topic expansion ------------------------------------ #
+            self._expand_topics(analysis)
 
-    def expand_topics(self, analysis):
-        for topic in analysis.get("keywords", []):
-            if topic not in self.discovered_topics:
-                self.discovered_topics.add(topic)
+        except Exception:
+            logger.exception("Explorer error processing %s", url)
 
-    async def run_cycle(self):
+    # ------------------------------------------------------------------
+    # Topic discovery
+    # ------------------------------------------------------------------
+
+    def _expand_topics(self, analysis: dict) -> None:
+        for keyword in analysis.get("keywords", []):
+            if keyword not in self.discovered_topics:
+                self.discovered_topics.add(keyword)
+                logger.debug("Discovered new topic keyword: %s", keyword)
+
+    # ------------------------------------------------------------------
+    # Cycle control
+    # ------------------------------------------------------------------
+
+    async def run_cycle(self) -> None:
         for target in TARGETS:
             await self.explore_target(target)
 
-    async def run_forever(self, delay=1800):
+    async def run_forever(self, delay: int = 1800) -> None:
+        """
+        Run exploration cycles indefinitely, sleeping *delay* seconds
+        between each cycle.
+
+        FIX: was time.sleep(delay) which blocks the entire event loop.
+        asyncio.sleep() yields control so other coroutines can run.
+        """
         while True:
-            print("Starting exploration cycle")
+            logger.info("Starting exploration cycle")
             await self.run_cycle()
-            print("Cycle complete")
-            await asyncio.sleep(delay)   # FIX: was time.sleep() (blocks the event loop)
+            logger.info(
+                "Cycle complete. %d URLs visited, %d topics discovered.",
+                len(self.visited_urls),
+                len(self.discovered_topics),
+            )
+            await asyncio.sleep(delay)
 
 
 if __name__ == "__main__":
