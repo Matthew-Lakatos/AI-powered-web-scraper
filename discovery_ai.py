@@ -1,4 +1,3 @@
-from topic_expansion import expand_topic
 from llm_query_expansion import generate_queries
 
 
