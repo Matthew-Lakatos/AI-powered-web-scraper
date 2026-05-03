@@ -108,9 +108,9 @@ def analyze(text, url):
 
     embedding = generate_embedding(summary)
 
-    targets = detect_targets(article_text)
+    targets = detect_targets(text)
 
-    claims = extract_claims(article_text)
+    claims = extract_claims(text)
     
     analysis["targets"] = targets
     analysis["claims"] = claims
