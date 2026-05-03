@@ -25,7 +25,7 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from analyzer import analyze_all
@@ -171,7 +171,7 @@ async def run_pipeline(
             credibility,                       # 10  credibility
             propaganda["score"],               # 11  propaganda_score
             json.dumps(propaganda["flags"]),   # 12  propaganda_flags
-            datetime.utcnow().isoformat(),     # 13  last_scraped
+            datetime.now(timezone.utc).isoformat(),     # 13  last_scraped
         ))
 
     # ------------------------------------------------------------------ #
