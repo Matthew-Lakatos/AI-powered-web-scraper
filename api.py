@@ -6,7 +6,7 @@ import json
 from discovery import discover_urls
 from crawler import crawl
 from database import get_connection
-from main import run_pipeline
+from main import run_pipeline, run_finance_pipeline, DEFAULT_URLS, FINANCE_URLS
 from embeddings import generate_embedding
 from vector_store import VectorStore
 
@@ -103,6 +103,24 @@ async def crawl_site(url: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(task)
 
     return {"status": "crawl started"}
+
+
+# -------------------------
+# PIPELINE SHORTCUTS
+# -------------------------
+
+@app.post("/run-default")
+async def run_default(background_tasks: BackgroundTasks):
+    """Run pipeline over the built-in default URL set."""
+    background_tasks.add_task(run_pipeline, DEFAULT_URLS)
+    return {"status": "started", "urls": DEFAULT_URLS}
+
+
+@app.post("/run-finance")
+async def run_finance(background_tasks: BackgroundTasks):
+    """Run pipeline over all curated finance + government URLs."""
+    background_tasks.add_task(run_finance_pipeline)
+    return {"status": "started", "mode": "finance", "url_count": len(FINANCE_URLS)}
 
 
 # -------------------------
