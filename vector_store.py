@@ -7,14 +7,14 @@ from embeddings import generate_embedding
 
 
 INDEX_PATH = "faiss.index"
-META_PATH = "faiss_meta.pkl"
+META_PATH  = "faiss_meta.pkl"
 
 
 class VectorStore:
 
     def __init__(self, dim=384):
 
-        self.dim = dim
+        self.dim  = dim
         self.lock = Lock()
 
         if os.path.exists(INDEX_PATH):
@@ -42,11 +42,8 @@ class VectorStore:
             return
 
         with self.lock:
-
             vec = np.array([embedding]).astype("float32")
-
             self.index.add(vec)
-
             self.metadata.append(meta)
 
     def search(self, embedding, k=5):
@@ -56,19 +53,28 @@ class VectorStore:
 
         vec = np.array([embedding]).astype("float32")
 
+        # Clamp k so FAISS never receives a k larger than the index size.
+        k = min(k, self.index.ntotal)
+
         D, I = self.index.search(vec, k)
 
         results = []
 
-        for idx in I[0]:
-
-            if idx < len(self.metadata):
-                results.append(self.metadata[idx])
+        for score, idx in zip(D[0], I[0]):
+            if 0 <= idx < len(self.metadata):
+                # Attach similarity score so callers can rank / threshold.
+                entry = (
+                    dict(self.metadata[idx])
+                    if isinstance(self.metadata[idx], dict)
+                    else {"data": self.metadata[idx]}
+                )
+                entry["score"] = round(float(score), 4)
+                results.append(entry)
 
         return results
 
-    def store_embedding(self, text, metadata=None):
-    
+    def store_embedding(self, text: str, metadata=None):
+        """Generate an embedding for *text* and add it to the index.
+        """
         vector = generate_embedding(text)
-    
-        self.add(vector, metadata=None)
+        self.add(vector, metadata)
