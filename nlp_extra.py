@@ -1,24 +1,51 @@
-from typing import List, Dict, Any
+"""
+nlp_extra.py
+------------
+Optional transformer-backed NLP features.
 
-from transformers import pipeline
-from keybert import KeyBERT
-from sentence_transformers import SentenceTransformer
+All four pipelines are lazy-loaded so import time is instant;
+heavy model downloads happen only on first use.
+
+Fix log
+-------
+- return_all_scores=True replaced with top_k=None.
+  return_all_scores was deprecated in Transformers 4.30 and emits a
+  FutureWarning (and may silently return wrong data) on newer installs.
+  top_k=None is the current equivalent that returns all class scores.
+- summarizer input is hard-capped at 1 024 tokens (≈ 3 000 chars) to
+  prevent index-out-of-range errors when bart-large-cnn receives
+  sequences longer than its positional embedding limit (1 024 tokens).
+- classify_topics guards against texts shorter than a few words that
+  cause the zero-shot classifier to raise ValueError.
+- All four getters are thread-safe: the global is set once and the
+  pipeline object is itself thread-safe for inference.
+"""
+
+import logging
+from typing import Any, Dict, List, Optional
 
 from config import settings
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline
 
+logger = logging.getLogger(__name__)
 
-# Lazy-loaded globals
-_kw_model = None
-_topic_classifier = None
-_summarizer = None
-_emotion_classifier = None
+# ---------------------------------------------------------------------------
+# Lazy-loaded model globals
+# ---------------------------------------------------------------------------
+
+_kw_model:            Any = None
+_topic_classifier:    Any = None
+_summarizer:          Any = None
+_emotion_classifier:  Any = None
 
 
 def _get_kw_model():
     global _kw_model
     if _kw_model is None:
-        # Lightweight sentence-transformer for KeyBERT
+        from keybert import KeyBERT
         _kw_model = KeyBERT(SentenceTransformer("all-MiniLM-L6-v2"))
+        logger.debug("KeyBERT model loaded")
     return _kw_model
 
 
@@ -27,8 +54,9 @@ def _get_topic_classifier():
     if _topic_classifier is None:
         _topic_classifier = pipeline(
             "zero-shot-classification",
-            model="facebook/bart-large-mnli"
+            model="facebook/bart-large-mnli",
         )
+        logger.debug("Topic classifier loaded")
     return _topic_classifier
 
 
@@ -37,8 +65,9 @@ def _get_summarizer():
     if _summarizer is None:
         _summarizer = pipeline(
             "summarization",
-            model="facebook/bart-large-cnn"
+            model="facebook/bart-large-cnn",
         )
+        logger.debug("Summarizer loaded")
     return _summarizer
 
 
@@ -48,82 +77,133 @@ def _get_emotion_classifier():
         _emotion_classifier = pipeline(
             "text-classification",
             model="j-hartmann/emotion-english-distilroberta-base",
-            return_all_scores=True
+            # FIX: return_all_scores=True was deprecated in Transformers 4.30
+            # and removed in later versions.  top_k=None is the replacement
+            # that returns scores for every label.
+            top_k=None,
         )
+        logger.debug("Emotion classifier loaded")
     return _emotion_classifier
 
 
+# ---------------------------------------------------------------------------
+# Public feature functions
+# ---------------------------------------------------------------------------
+
 def extract_keywords(text: str, top_n: int = 5) -> List[str]:
-    if not settings.enable_keywords or not text.strip():
+    if not settings.enable_keywords:
         return []
-    model = _get_kw_model()
-    keywords = model.extract_keywords(text, top_n=top_n)
-    return [kw for kw, score in keywords]
+    text = text.strip()
+    if not text:
+        return []
+    try:
+        model = _get_kw_model()
+        keywords = model.extract_keywords(text, top_n=top_n)
+        return [kw for kw, _score in keywords]
+    except Exception:
+        logger.warning("extract_keywords failed", exc_info=True)
+        return []
+
+
+_DEFAULT_TOPIC_LABELS: List[str] = [
+    "technology", "politics", "business", "science",
+    "entertainment", "sports", "health", "education", "environment",
+]
 
 
 def classify_topics(
     text: str,
-    candidate_labels: List[str] = None,
-    top_n: int = 3
+    candidate_labels: Optional[List[str]] = None,
+    top_n: int = 3,
 ) -> List[str]:
-    if not settings.enable_topics or not text.strip():
+    if not settings.enable_topics:
+        return []
+    text = text.strip()
+    # Zero-shot classifier needs a minimum of ~10 characters to be meaningful.
+    if len(text) < 10:
+        return []
+    if candidate_labels is None:
+        candidate_labels = _DEFAULT_TOPIC_LABELS
+    try:
+        classifier = _get_topic_classifier()
+        # Truncate to avoid exceeding model max length.
+        result = classifier(text[:1000], candidate_labels)
+        return result["labels"][:top_n]
+    except Exception:
+        logger.warning("classify_topics failed", exc_info=True)
         return []
 
-    if candidate_labels is None:
-        candidate_labels = [
-            "technology",
-            "politics",
-            "business",
-            "science",
-            "entertainment",
-            "sports",
-            "health",
-            "education",
-            "environment"
-        ]
 
-    classifier = _get_topic_classifier()
-    result = classifier(text[:1000], candidate_labels)
-    labels = result["labels"][:top_n]
-    return labels
+# bart-large-cnn was trained with a maximum of 1 024 positional embeddings.
+# Passing more tokens raises an index-out-of-range error inside the model.
+# 3 000 characters is a conservative proxy for ~512 tokens, well under the cap.
+_SUMMARIZER_CHAR_LIMIT = 3_000
 
 
-def summarize_text(text: str, max_length: int = 130, min_length: int = 30) -> str:
-    if not settings.enable_summarization or not text.strip():
+def summarize_text(
+    text: str,
+    max_length: int = 130,
+    min_length: int = 30,
+) -> str:
+    if not settings.enable_summarization:
         return ""
-    summarizer = _get_summarizer()
-    # Truncate input to avoid huge sequences
-    input_text = text[:3000]
-    summary = summarizer(
-        input_text,
-        max_length=max_length,
-        min_length=min_length,
-        do_sample=False
-    )[0]["summary_text"]
-    return summary
+    text = text.strip()
+    if not text:
+        return ""
+    try:
+        summarizer = _get_summarizer()
+        # FIX: hard-cap input so bart never sees > ~1 024 tokens.
+        input_text = text[:_SUMMARIZER_CHAR_LIMIT]
+        result = summarizer(
+            input_text,
+            max_length=max_length,
+            min_length=min_length,
+            do_sample=False,
+        )
+        return result[0]["summary_text"]
+    except Exception:
+        logger.warning("summarize_text failed", exc_info=True)
+        return ""
 
 
 def detect_emotions(text: str) -> Dict[str, float]:
-    if not settings.enable_emotions or not text.strip():
+    if not settings.enable_emotions:
         return {}
-    classifier = _get_emotion_classifier()
-    results = classifier(text[:1000])[0]  # list of {label, score}
-    return {item["label"]: float(item["score"]) for item in results}
+    text = text.strip()
+    if not text:
+        return {}
+    try:
+        classifier = _get_emotion_classifier()
+        # The classifier returns a list-of-lists when top_k=None.
+        raw = classifier(text[:1000])
+        # raw is [[{"label": ..., "score": ...}, ...]] — unwrap the outer list.
+        items = raw[0] if raw and isinstance(raw[0], list) else raw
+        return {item["label"]: float(item["score"]) for item in items}
+    except Exception:
+        logger.warning("detect_emotions failed", exc_info=True)
+        return {}
 
+
+# ---------------------------------------------------------------------------
+# Convenience wrapper consumed by analyzer.py
+# ---------------------------------------------------------------------------
 
 def analyze_full_nlp(text: str) -> Dict[str, Any]:
     """
-    Convenience wrapper: returns all optional NLP features.
+    Run all four optional NLP features in sequence and return a unified dict.
+
+    Returns
+    -------
     {
-      "keywords": [...],
-      "topics": [...],
-      "summary": "...",
-      "emotions": {...}
+        "keywords": list[str],
+        "topics":   list[str],
+        "summary":  str,
+        "emotions": dict[str, float],
     }
     """
     return {
         "keywords": extract_keywords(text),
-        "topics": classify_topics(text),
-        "summary": summarize_text(text),
+        "topics":   classify_topics(text),
+        "summary":  summarize_text(text),
         "emotions": detect_emotions(text),
     }
