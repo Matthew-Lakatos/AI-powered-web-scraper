@@ -1,5 +1,5 @@
 import os
-from dataclasses improt dataclass
+from dataclasses import dataclass
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,7 +22,6 @@ class Settings:
   database_path: str
   concurrency_limit: int
   enable_selenium_fallback: bool
-  enable_emotions: bool
   log_level: str
 
   # nlp models
