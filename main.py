@@ -43,10 +43,21 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_URLS: List[str] = [
-    "https://en.wikipedia.org/wiki/Artificial_intelligence",
+    # General news
     "https://www.bbc.com/news/technology",
     "https://www.theverge.com/tech",
+    # Finance
+    "https://finance.yahoo.com/news/",
+    "https://www.reuters.com/markets/",
+    "https://www.marketwatch.com/latest-news",
+    # Government / spending
+    "https://www.usaspending.gov/explorer",
+    "https://home.treasury.gov/news/press-releases",
 ]
+
+# URLs used when running in dedicated finance mode
+from target_profiles import ALL_FINANCE_URLS
+FINANCE_URLS: List[str] = ALL_FINANCE_URLS
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +68,12 @@ async def run_discovery(topic: str, max_pages: int = 50) -> None:
     urls = discover_urls(topic)
     crawled = await crawl(urls, max_pages=max_pages)
     await run_pipeline(crawled)
+
+
+async def run_finance_pipeline() -> None:
+    """Run the pipeline over all curated finance + government URLs."""
+    logger.info("Starting finance pipeline (%d URLs)", len(FINANCE_URLS))
+    await run_pipeline(FINANCE_URLS)
 
 
 # ---------------------------------------------------------------------------
