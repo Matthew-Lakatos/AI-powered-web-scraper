@@ -67,7 +67,7 @@ class VectorStore:
 
         return results
 
-    def store_embedding(text, metadata=None):
+    def store_embedding(self, text, metadata=None):
     
         vector = generate_embedding(text)
     
