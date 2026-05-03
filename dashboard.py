@@ -278,16 +278,24 @@ if "embedding" in filtered_df.columns:
     try:
 
         embeddings = []
+        indices    = []
 
-        for e in filtered_df["embedding"]:
-            if isinstance(e, list):
+        for i, e in enumerate(filtered_df["embedding"]):
+            # Embeddings are stored as JSON strings in SQLite; parse them here.
+            if isinstance(e, str):
+                try:
+                    import json
+                    e = json.loads(e)
+                except Exception:
+                    continue
+            if isinstance(e, list) and len(e) > 0:
                 embeddings.append(e)
+                indices.append(i)
 
         if len(embeddings) > 10:
 
             embeddings = np.array(embeddings)
 
-            # simple PCA projection
             from sklearn.decomposition import PCA
 
             pca = PCA(n_components=2)
@@ -295,19 +303,24 @@ if "embedding" in filtered_df.columns:
             reduced = pca.fit_transform(embeddings)
 
             cluster_df = pd.DataFrame({
-                "x": reduced[:, 0],
-                "y": reduced[:, 1],
-                "sentiment": filtered_df["sentiment"].values[:len(reduced)]
+                "x":         reduced[:, 0],
+                "y":         reduced[:, 1],
+                "sentiment": filtered_df["sentiment"].iloc[indices].values,
+                "url":       filtered_df["url"].iloc[indices].values,
             })
 
             fig = px.scatter(
                 cluster_df,
                 x="x",
                 y="y",
-                color="sentiment"
+                color="sentiment",
+                hover_data=["url"],
             )
 
             st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            st.info("At least 11 records with embeddings are needed to render the cluster plot.")
 
     except Exception:
 
