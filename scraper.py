@@ -76,22 +76,38 @@ def scrape_dynamic_content(url: str) -> str:
 
 async def _extract_text(html: str) -> str:
     """
-    Extract readable paragraph text from raw HTML using python-readability
-    with a BeautifulSoup fallback.
+    Extract readable paragraph text from raw HTML.
+
+    Strategy (tried in order, first result above the threshold wins):
+    1. python-readability  — best for article-style pages.
+    2. Direct <p> harvest  — catches pages (e.g. Wikipedia) whose layout
+       readability cannot parse cleanly.
+    3. Full-page text strip — last resort; always returns something.
     """
+    _MIN_CHARS = 200  # below this we consider extraction a failure
+
+    soup_full = BeautifulSoup(html, "lxml")
+
+    # 1. Readability pass
     try:
         doc     = Document(html)
-        cleaned = doc.summary()
-        soup    = BeautifulSoup(cleaned, "html.parser")
-        paragraphs = soup.find_all("p")
-        if paragraphs:
-            return " ".join(p.get_text(strip=True) for p in paragraphs)
+        cleaned = doc.summary(html_partial=True)
+        soup    = BeautifulSoup(cleaned, "lxml")
+        text    = " ".join(p.get_text(strip=True) for p in soup.find_all("p"))
+        if len(text) >= _MIN_CHARS:
+            return text
     except Exception:
         pass
 
-    # Plain fallback — no readability
-    soup = BeautifulSoup(html, "html.parser")
-    return " ".join(p.get_text(strip=True) for p in soup.find_all("p"))
+    # 2. Direct <p> harvest — works for Wikipedia-style and blog layouts
+    text = " ".join(p.get_text(strip=True) for p in soup_full.find_all("p"))
+    if len(text) >= _MIN_CHARS:
+        return text
+
+    # 3. Full-page strip — guarantees a non-empty result on any valid HTML
+    for tag in soup_full(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    return soup_full.get_text(separator=" ", strip=True)
 
 
 # ---------------------------------------------------------------------------
