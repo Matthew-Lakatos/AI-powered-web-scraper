@@ -71,5 +71,4 @@ class VectorStore:
     
         vector = generate_embedding(text)
     
-        # existing vector db storage logic
-        save_vector(vector, metadata)
+        self.add(vector, metadata=None)
