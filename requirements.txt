@@ -4,9 +4,11 @@ streamlit
 requests
 pandas
 numpy
+openai
 plotly
 textblob
 scikit-learn
+keybert
 beautifulsoup4
 lxml
 readability-lxml
