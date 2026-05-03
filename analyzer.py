@@ -14,17 +14,30 @@ analyze_all(text, url='') -> dict
         keywords   : list[str]
         topics     : list[str]
         summary    : str
-        emotions   : dict[str, float | int]
+        emotions   : dict[str, float | int}
         propaganda : {"score": float, "flags": list[str],
                       "confidence": str, "techniques": list[dict]}
+
+Sentiment
+---------
+ProsusAI/finbert is used for sentiment — a BERT model fine-tuned on
+financial news (FiQA, Reuters, Bloomberg headlines).  It understands
+financial language that general models mis-score, e.g.:
+  "The Fed held rates steady"  → NEUTRAL  (TextBlob: weakly POSITIVE)
+  "Earnings missed estimates"  → NEGATIVE (TextBlob: NEUTRAL)
+  "Revenue beat by 12 percent" → POSITIVE (TextBlob: POSITIVE ✓)
+
+Long texts are chunk-scored: the article is split into 450-token
+overlapping windows, each window is scored independently, and the
+final label and score are the confidence-weighted mean across all
+windows.  This prevents truncation from discarding the article
+conclusion, which is typically the most sentiment-dense segment.
 
 Internal helpers are kept private (prefixed with _).
 """
 
 import logging
 from typing import Any
-
-from textblob import TextBlob
 
 # NLP helpers — lazy-loaded heavy models live in nlp_extra
 from nlp_extra import analyze_full_nlp
@@ -95,14 +108,125 @@ def _fallback_summary(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Sentiment (TextBlob — always available, no heavy model needed)
+# Sentiment — ProsusAI/finbert (lazy-loaded, chunk-scored)
 # ---------------------------------------------------------------------------
 
+_finbert_pipeline = None
+
+
+def _get_finbert():
+    """
+    Lazy-load FinBERT once and cache it.  The model is ~440 MB and takes
+    a few seconds to load; subsequent calls return the cached pipeline
+    instantly.  Thread-safe: the GIL protects the assignment.
+    """
+    global _finbert_pipeline
+    if _finbert_pipeline is None:
+        from transformers import pipeline as hf_pipeline
+        _finbert_pipeline = hf_pipeline(
+            "text-classification",
+            model="ProsusAI/finbert",
+            # Return all three class scores so we can build a signed float.
+            top_k=None,
+            truncation=True,      # safety net for single-chunk path
+            max_length=512,
+        )
+        logger.info("FinBERT sentiment model loaded")
+    return _finbert_pipeline
+
+
+# FinBERT's tokeniser limit is 512 tokens (~1 800 chars at ~3.5 chars/token).
+# We use 450-token windows with a 50-token overlap so sentence boundaries
+# that fall near a chunk edge are captured by both adjacent chunks.
+_CHUNK_CHARS  = 1_600   # ≈ 450 tokens — safe margin under the 512 limit
+_OVERLAP_CHARS =  180   # ≈ 50 tokens  — overlap between consecutive chunks
+
+
+def _score_chunks(text: str) -> list[dict]:
+    """
+    Split *text* into overlapping character windows and run FinBERT on each.
+    Returns a list of raw pipeline outputs (one per chunk).
+    """
+    model   = _get_finbert()
+    chunks  = []
+    start   = 0
+    while start < len(text):
+        end = start + _CHUNK_CHARS
+        chunks.append(text[start:end])
+        if end >= len(text):
+            break
+        start = end - _OVERLAP_CHARS   # step back to create overlap
+
+    results = []
+    for chunk in chunks:
+        try:
+            output = model(chunk)
+            # pipeline returns [[{label, score}, ...]] with top_k=None
+            results.append(output[0] if isinstance(output[0], list) else output)
+        except Exception:
+            logger.debug("FinBERT chunk scoring failed", exc_info=True)
+    return results
+
+
 def _sentiment(text: str) -> dict[str, Any]:
-    blob = TextBlob(text)
-    polarity: float = blob.sentiment.polarity
-    label = "POSITIVE" if polarity > 0 else ("NEGATIVE" if polarity < 0 else "NEUTRAL")
-    return {"label": label, "score": round(polarity, 4)}
+    """
+    Score *text* with ProsusAI/finbert.
+
+    Long texts are split into overlapping 450-token windows; each window
+    produces a (positive, negative, neutral) probability triple.  The
+    final score is the confidence-weighted mean signed polarity across
+    all windows:
+        score = Σ(confidence_i × signed_score_i) / Σ(confidence_i)
+    where signed_score = +p_positive − p_negative (neutral ≈ 0).
+
+    Returns
+    -------
+    {"label": "POSITIVE"|"NEGATIVE"|"NEUTRAL", "score": float [-1, 1]}
+    """
+    if not text or not text.strip():
+        return {"label": "NEUTRAL", "score": 0.0}
+
+    try:
+        chunk_results = _score_chunks(text.strip())
+
+        if not chunk_results:
+            return {"label": "NEUTRAL", "score": 0.0}
+
+        weighted_sum = 0.0
+        weight_total = 0.0
+
+        for chunk_labels in chunk_results:
+            # Build a dict {label_lower: score} for this chunk
+            scores = {item["label"].lower(): item["score"] for item in chunk_labels}
+            p_pos  = scores.get("positive", 0.0)
+            p_neg  = scores.get("negative", 0.0)
+            p_neu  = scores.get("neutral",  0.0)
+
+            # Signed polarity: ranges from -1 (all negative) to +1 (all positive)
+            signed   = p_pos - p_neg
+            # Confidence = how far from pure neutral this chunk is
+            confidence = 1.0 - p_neu
+            weighted_sum  += signed * confidence
+            weight_total  += confidence
+
+        if weight_total < 1e-9:
+            return {"label": "NEUTRAL", "score": 0.0}
+
+        final_score = weighted_sum / weight_total
+        final_score = max(-1.0, min(1.0, final_score))   # clamp to [-1, 1]
+
+        if final_score > 0.05:
+            label = "POSITIVE"
+        elif final_score < -0.05:
+            label = "NEGATIVE"
+        else:
+            label = "NEUTRAL"
+
+        return {"label": label, "score": round(final_score, 4)}
+
+    except Exception:
+        logger.warning("FinBERT sentiment failed — returning NEUTRAL", exc_info=True)
+        return {"label": "NEUTRAL", "score": 0.0}
 
 
 # ---------------------------------------------------------------------------
