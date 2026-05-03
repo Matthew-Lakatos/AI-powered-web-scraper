@@ -63,8 +63,12 @@ def _get_topic_classifier():
 def _get_summarizer():
     global _summarizer
     if _summarizer is None:
+        # "summarization" was removed as a registered task alias in newer
+        # versions of transformers.  Loading via the model's own pipeline_tag
+        # ("text2text-generation") works across all versions; we keep the same
+        # generate kwargs so callers are unaffected.
         _summarizer = pipeline(
-            "summarization",
+            "text2text-generation",
             model="facebook/bart-large-cnn",
         )
         logger.debug("Summarizer loaded")
@@ -160,7 +164,10 @@ def summarize_text(
             min_length=min_length,
             do_sample=False,
         )
-        return result[0]["summary_text"]
+        # text2text-generation returns "generated_text"; summarization returned
+        # "summary_text".  Support both so the code is robust to either pipeline.
+        r = result[0]
+        return r.get("summary_text") or r.get("generated_text", "")
     except Exception:
         logger.warning("summarize_text failed", exc_info=True)
         return ""
