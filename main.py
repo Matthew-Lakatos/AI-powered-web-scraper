@@ -41,6 +41,8 @@ async def run_pipeline(urls: List[str], monitor: Optional[Monitor] = None):
 
     logger.info("Starting scraping pipeline")
 
+    create_db()
+
     urls = list(set(urls))
     urls_to_scrape = []
 
@@ -79,7 +81,6 @@ async def run_pipeline(urls: List[str], monitor: Optional[Monitor] = None):
         propaganda = analysis["propaganda"]
 
         embedding   = generate_embedding(summary or text[:1000])
-        # FIX: was credibility_score(url) — correct call is compute_credibility(url, text)
         credibility = compute_credibility(url, text)
 
         rows_to_insert.append((
@@ -94,11 +95,9 @@ async def run_pipeline(urls: List[str], monitor: Optional[Monitor] = None):
             json.dumps(embedding),
             credibility,
             propaganda["score"],
-            json.dumps(propaganda["flags"]),   # FIX: was techniques+flags merged — only store flags
+            json.dumps(propaganda["flags"]),
             datetime.utcnow().isoformat(),
         ))
-
-    create_db()
 
     with get_connection() as conn:
         save_many_to_db(conn, rows_to_insert)
