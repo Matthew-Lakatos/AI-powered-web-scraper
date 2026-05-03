@@ -14,6 +14,9 @@ def get_connection():
     finally:
         conn.close()
 
+def save_many_to_db(conn, rows):
+    conn.executemany('INSERT INTO sentiment_data VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', rows)
+    conn.commit()
 
 def create_db():
 
