@@ -1,287 +1,690 @@
 """
 target_profiles.py
 ------------------
-Entity definitions for the scraping pipeline.
+Ultra-robust quant-grade target universe + structured data sources.
 
-Structure
----------
-Each target is a dict with:
-    name       : display name / DB key
-    type       : "company" | "index" | "macro" | "government"
-    industry   : sector label
-    ticker     : Yahoo Finance ticker symbol (None if not a traded instrument)
-    keywords   : list of strings used by detect_targets() for mention matching
-    news_urls  : curated high-signal URLs for this entity (scraped by default)
+Focus:
+- Equities / indices / ETFs
+- AI ecosystem
+- Defence / government spend
+- Macro / rates / inflation
+- UK / EU / China / global data
+- Energy / biotech / weather / commodities
+- Rich news_urls + data_urls populated wherever practical
 
-FINANCE_URLS / MACRO_URLS / GOVERNMENT_URLS
-    Module-level lists of URLs that are always scraped in finance mode,
-    regardless of specific target matching.  Imported by main.py.
+Schema:
+    name
+    type
+    industry
+    ticker
+    keywords
+    news_urls
+    data_urls
+    priority      # 1-5
+    tags
 """
 
 from typing import Optional
 
 
-# ---------------------------------------------------------------------------
-# Target definitions
-# ---------------------------------------------------------------------------
+# =====================================================================
+# TARGETS
+# =====================================================================
 
 TARGETS = [
 
-    # ---- Mega-cap tech (already present) --------------------------------- #
-    {
-        "name":      "Apple",
-        "type":      "company",
-        "industry":  "technology",
-        "ticker":    "AAPL",
-        "keywords":  ["Apple", "iPhone", "Tim Cook", "AAPL"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/AAPL/news/",
-            "https://www.reuters.com/technology/",
-        ],
-    },
-    {
-        "name":      "NVIDIA",
-        "type":      "company",
-        "industry":  "semiconductors",
-        "ticker":    "NVDA",
-        "keywords":  ["NVIDIA", "GPU", "AI chips", "Jensen Huang", "NVDA"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/NVDA/news/",
-            "https://www.reuters.com/technology/",
-        ],
-    },
-    {
-        "name":      "Tesla",
-        "type":      "company",
-        "industry":  "automotive",
-        "ticker":    "TSLA",
-        "keywords":  ["Tesla", "Elon Musk", "autonomous driving", "TSLA"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/TSLA/news/",
-            "https://electrek.co/",
-        ],
-    },
-    {
-        "name":      "SpaceX",
-        "type":      "company",
-        "industry":  "aerospace",
-        "ticker":    None,          # private company
-        "keywords":  ["SpaceX", "Starship", "Falcon 9"],
-        "news_urls": [
-            "https://www.reuters.com/science/space/",
-        ],
-    },
-    {
-        "name":      "Google",
-        "type":      "company",
-        "industry":  "technology",
-        "ticker":    "GOOGL",
-        "keywords":  ["Google", "Alphabet", "Gemini AI", "GOOGL"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/GOOGL/news/",
-        ],
-    },
-    {
-        "name":      "Microsoft",
-        "type":      "company",
-        "industry":  "technology",
-        "ticker":    "MSFT",
-        "keywords":  ["Microsoft", "Azure", "OpenAI partnership", "MSFT"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/MSFT/news/",
-        ],
-    },
-    {
-        "name":      "OpenAI",
-        "type":      "company",
-        "industry":  "AI",
-        "ticker":    None,          # private company
-        "keywords":  ["OpenAI", "ChatGPT", "GPT models"],
-        "news_urls": [
-            "https://techcrunch.com/tag/openai/",
-        ],
-    },
+# ---------------------------------------------------------------------
+# US BIG TECH / AI
+# ---------------------------------------------------------------------
 
-    # ---- Additional high-value equities ---------------------------------- #
-    {
-        "name":      "Amazon",
-        "type":      "company",
-        "industry":  "ecommerce/cloud",
-        "ticker":    "AMZN",
-        "keywords":  ["Amazon", "AWS", "Jeff Bezos", "Andy Jassy", "AMZN"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/AMZN/news/",
-        ],
-    },
-    {
-        "name":      "Meta",
-        "type":      "company",
-        "industry":  "social media",
-        "ticker":    "META",
-        "keywords":  ["Meta", "Facebook", "Instagram", "Mark Zuckerberg", "META"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/META/news/",
-        ],
-    },
-    {
-        "name":      "JPMorgan",
-        "type":      "company",
-        "industry":  "banking",
-        "ticker":    "JPM",
-        "keywords":  ["JPMorgan", "JP Morgan", "Jamie Dimon", "JPM"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/JPM/news/",
-            "https://www.ft.com/companies/banks",
-        ],
-    },
+{
+    "name": "Apple",
+    "type": "company",
+    "industry": "technology",
+    "ticker": "AAPL",
+    "keywords": ["Apple", "AAPL", "iPhone", "Tim Cook"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/AAPL/news/",
+        "https://www.reuters.com/technology/",
+        "https://www.macrumors.com/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 4,
+    "tags": ["hardware", "consumer", "mega-cap"],
+},
 
-    # ---- Market indices -------------------------------------------------- #
-    {
-        "name":      "S&P 500",
-        "type":      "index",
-        "industry":  "broad market",
-        "ticker":    "^GSPC",
-        "keywords":  ["S&P 500", "S&P500", "SPX", "SPY", "broad market"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/%5EGSPC/news/",
-            "https://www.marketwatch.com/investing/index/spx",
-        ],
-    },
-    {
-        "name":      "NASDAQ",
-        "type":      "index",
-        "industry":  "technology index",
-        "ticker":    "^IXIC",
-        "keywords":  ["NASDAQ", "Nasdaq Composite", "QQQ", "tech stocks"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/%5EIXIC/news/",
-        ],
-    },
-    {
-        "name":      "Dow Jones",
-        "type":      "index",
-        "industry":  "broad market",
-        "ticker":    "^DJI",
-        "keywords":  ["Dow Jones", "DJIA", "Dow 30", "DIA"],
-        "news_urls": [
-            "https://finance.yahoo.com/quote/%5EDJI/news/",
-        ],
-    },
+{
+    "name": "Microsoft",
+    "type": "company",
+    "industry": "cloud/software",
+    "ticker": "MSFT",
+    "keywords": ["Microsoft", "MSFT", "Azure", "Satya Nadella", "OpenAI"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/MSFT/news/",
+        "https://www.reuters.com/technology/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+        "https://azure.microsoft.com/en-gb/blog/",
+    ],
+    "priority": 5,
+    "tags": ["ai", "cloud", "mega-cap"],
+},
 
-    # ---- Macro / rates --------------------------------------------------- #
-    {
-        "name":      "Federal Reserve",
-        "type":      "macro",
-        "industry":  "monetary policy",
-        "ticker":    None,
-        "keywords":  ["Federal Reserve", "Fed", "Jerome Powell", "FOMC",
-                      "interest rates", "rate hike", "rate cut"],
-        "news_urls": [
-            "https://www.federalreserve.gov/newsevents/pressreleases.htm",
-            "https://www.reuters.com/markets/us/",
-        ],
-    },
-    {
-        "name":      "US Treasury",
-        "type":      "macro",
-        "industry":  "fiscal policy",
-        "ticker":    None,
-        "keywords":  ["US Treasury", "Treasury yield", "10-year yield",
-                      "Janet Yellen", "Treasury bonds", "T-bills"],
-        "news_urls": [
-            "https://home.treasury.gov/news/press-releases",
-            "https://finance.yahoo.com/quote/%5ETNX/",   # 10Y yield
-        ],
-    },
+{
+    "name": "NVIDIA",
+    "type": "company",
+    "industry": "semiconductors",
+    "ticker": "NVDA",
+    "keywords": ["NVIDIA", "NVDA", "GPU", "Jensen Huang"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/NVDA/news/",
+        "https://www.reuters.com/technology/",
+        "https://www.tomshardware.com/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 5,
+    "tags": ["ai", "chips", "momentum"],
+},
 
-    # ---- Government spending --------------------------------------------- #
-    {
-        "name":      "US Federal Spending",
-        "type":      "government",
-        "industry":  "fiscal",
-        "ticker":    None,
-        "keywords":  ["federal spending", "government contract", "usaspending",
-                      "defense spending", "federal budget", "appropriations"],
-        "news_urls": [
-            "https://www.usaspending.gov/explorer",
-            "https://www.usaspending.gov/agency",
-            "https://fiscaldata.treasury.gov/datasets/",
-        ],
-    },
-    {
-        "name":      "SEC Filings",
-        "type":      "government",
-        "industry":  "regulation",
-        "ticker":    None,
-        "keywords":  ["SEC filing", "10-K", "10-Q", "8-K", "earnings report",
-                      "Securities and Exchange Commission"],
-        "news_urls": [
-            "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K",
-            "https://efts.sec.gov/LATEST/search-index?q=%22earnings%22&dateRange=custom&startdt=2024-01-01&forms=8-K",
-        ],
-    },
+{
+    "name": "Amazon",
+    "type": "company",
+    "industry": "cloud/ecommerce",
+    "ticker": "AMZN",
+    "keywords": ["Amazon", "AMZN", "AWS"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/AMZN/news/",
+        "https://www.reuters.com/technology/",
+    ],
+    "data_urls": [
+        "https://aws.amazon.com/blogs/aws/",
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 5,
+    "tags": ["cloud", "consumer"],
+},
+
+{
+    "name": "Google",
+    "type": "company",
+    "industry": "internet/cloud",
+    "ticker": "GOOGL",
+    "keywords": ["Google", "Alphabet", "GOOGL", "Gemini", "DeepMind"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/GOOGL/news/",
+        "https://blog.google/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 5,
+    "tags": ["ai", "search", "cloud"],
+},
+
+{
+    "name": "Meta",
+    "type": "company",
+    "industry": "social media",
+    "ticker": "META",
+    "keywords": ["Meta", "META", "Facebook", "Instagram", "Llama"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/META/news/",
+        "https://about.fb.com/news/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 4,
+    "tags": ["ai", "ads"],
+},
+
+{
+    "name": "Tesla",
+    "type": "company",
+    "industry": "automotive",
+    "ticker": "TSLA",
+    "keywords": ["Tesla", "TSLA", "Elon Musk", "robotaxi", "FSD"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/TSLA/news/",
+        "https://electrek.co/",
+        "https://www.reuters.com/business/autos-transportation/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 5,
+    "tags": ["ev", "ai", "momentum"],
+},
+
+# ---------------------------------------------------------------------
+# PRIVATE AI / GLOBAL AI
+# ---------------------------------------------------------------------
+
+{
+    "name": "OpenAI",
+    "type": "company",
+    "industry": "AI",
+    "ticker": None,
+    "keywords": ["OpenAI", "ChatGPT", "GPT-5", "GPT"],
+    "news_urls": [
+        "https://techcrunch.com/tag/openai/",
+        "https://openai.com/blog/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["private", "ai"],
+},
+
+{
+    "name": "Anthropic",
+    "type": "company",
+    "industry": "AI",
+    "ticker": None,
+    "keywords": ["Anthropic", "Claude"],
+    "news_urls": [
+        "https://www.anthropic.com/news",
+        "https://techcrunch.com/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["private", "ai"],
+},
+
+{
+    "name": "xAI",
+    "type": "company",
+    "industry": "AI",
+    "ticker": None,
+    "keywords": ["xAI", "Grok"],
+    "news_urls": [
+        "https://x.ai/",
+        "https://www.reuters.com/technology/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["private", "ai"],
+},
+
+{
+    "name": "DeepSeek",
+    "type": "company",
+    "industry": "AI",
+    "ticker": None,
+    "keywords": ["DeepSeek", "DeepSeek AI"],
+    "news_urls": [
+        "https://www.scmp.com/",
+        "https://www.reuters.com/world/china/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["china", "ai"],
+},
+
+{
+    "name": "Alibaba",
+    "type": "company",
+    "industry": "china tech",
+    "ticker": "BABA",
+    "keywords": ["Alibaba", "BABA", "AliCloud"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/BABA/news/",
+        "https://www.reuters.com/world/china/",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 4,
+    "tags": ["china", "cloud"],
+},
+
+{
+    "name": "Tencent",
+    "type": "company",
+    "industry": "china tech",
+    "ticker": "TCEHY",
+    "keywords": ["Tencent", "WeChat", "TCEHY"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/TCEHY/news/",
+        "https://www.reuters.com/world/china/",
+    ],
+    "data_urls": [],
+    "priority": 4,
+    "tags": ["china", "ai"],
+},
+
+# ---------------------------------------------------------------------
+# DEFENCE / GOV TECH
+# ---------------------------------------------------------------------
+
+{
+    "name": "Lockheed Martin",
+    "type": "company",
+    "industry": "defence",
+    "ticker": "LMT",
+    "keywords": ["Lockheed", "Lockheed Martin", "LMT"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/LMT/news/",
+        "https://www.defensenews.com/",
+    ],
+    "data_urls": [
+        "https://api.usaspending.gov/api/v2/awards/",
+    ],
+    "priority": 5,
+    "tags": ["contracts", "defence"],
+},
+
+{
+    "name": "Raytheon",
+    "type": "company",
+    "industry": "defence",
+    "ticker": "RTX",
+    "keywords": ["Raytheon", "RTX"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/RTX/news/",
+        "https://www.defensenews.com/",
+    ],
+    "data_urls": [
+        "https://api.usaspending.gov/api/v2/awards/",
+    ],
+    "priority": 5,
+    "tags": ["contracts"],
+},
+
+{
+    "name": "Northrop Grumman",
+    "type": "company",
+    "industry": "defence",
+    "ticker": "NOC",
+    "keywords": ["Northrop", "NOC"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/NOC/news/",
+    ],
+    "data_urls": [
+        "https://api.usaspending.gov/api/v2/awards/",
+    ],
+    "priority": 4,
+    "tags": ["contracts"],
+},
+
+{
+    "name": "Palantir",
+    "type": "company",
+    "industry": "software/defence",
+    "ticker": "PLTR",
+    "keywords": ["Palantir", "PLTR"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/PLTR/news/",
+    ],
+    "data_urls": [
+        "https://api.usaspending.gov/api/v2/awards/",
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 5,
+    "tags": ["ai", "government"],
+},
+
+# ---------------------------------------------------------------------
+# FINANCIALS
+# ---------------------------------------------------------------------
+
+{
+    "name": "JPMorgan",
+    "type": "company",
+    "industry": "banking",
+    "ticker": "JPM",
+    "keywords": ["JPMorgan", "JPM", "Jamie Dimon"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/JPM/news/",
+        "https://www.ft.com/companies/banks",
+    ],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+    ],
+    "priority": 3,
+    "tags": ["banking"],
+},
+
+# ---------------------------------------------------------------------
+# INDICES / ETFS
+# ---------------------------------------------------------------------
+
+{
+    "name": "S&P 500",
+    "type": "index",
+    "industry": "broad market",
+    "ticker": "^GSPC",
+    "keywords": ["S&P 500", "SPX", "SPY"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/%5EGSPC/news/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["benchmark"],
+},
+
+{
+    "name": "NASDAQ",
+    "type": "index",
+    "industry": "technology",
+    "ticker": "^IXIC",
+    "keywords": ["NASDAQ", "QQQ"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/%5EIXIC/news/",
+    ],
+    "data_urls": [],
+    "priority": 5,
+    "tags": ["benchmark"],
+},
+
+{
+    "name": "Dow Jones",
+    "type": "index",
+    "industry": "broad market",
+    "ticker": "^DJI",
+    "keywords": ["Dow Jones", "DJIA"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/%5EDJI/news/",
+    ],
+    "data_urls": [],
+    "priority": 4,
+    "tags": ["benchmark"],
+},
+
+{
+    "name": "ITA",
+    "type": "index",
+    "industry": "defence ETF",
+    "ticker": "ITA",
+    "keywords": ["ITA"],
+    "news_urls": [
+        "https://finance.yahoo.com/quote/ITA/news/",
+    ],
+    "data_urls": [],
+    "priority": 4,
+    "tags": ["defence"],
+},
+
+# ---------------------------------------------------------------------
+# MACRO / CENTRAL BANKS
+# ---------------------------------------------------------------------
+
+{
+    "name": "Federal Reserve",
+    "type": "macro",
+    "industry": "rates",
+    "ticker": None,
+    "keywords": ["Federal Reserve", "Fed", "FOMC", "Powell"],
+    "news_urls": [
+        "https://www.federalreserve.gov/newsevents/pressreleases.htm",
+    ],
+    "data_urls": [
+        "https://fred.stlouisfed.org/",
+    ],
+    "priority": 5,
+    "tags": ["rates", "us"],
+},
+
+{
+    "name": "Bank of England",
+    "type": "macro",
+    "industry": "rates",
+    "ticker": None,
+    "keywords": ["Bank of England", "BoE"],
+    "news_urls": [
+        "https://www.bankofengland.co.uk/news",
+    ],
+    "data_urls": [
+        "https://www.bankofengland.co.uk/statistics",
+    ],
+    "priority": 5,
+    "tags": ["uk", "rates"],
+},
+
+{
+    "name": "European Central Bank",
+    "type": "macro",
+    "industry": "rates",
+    "ticker": None,
+    "keywords": ["ECB", "European Central Bank"],
+    "news_urls": [
+        "https://www.ecb.europa.eu/press/html/index.en.html",
+    ],
+    "data_urls": [
+        "https://www.ecb.europa.eu/stats/",
+    ],
+    "priority": 5,
+    "tags": ["eu", "rates"],
+},
+
+# ---------------------------------------------------------------------
+# DATASETS
+# ---------------------------------------------------------------------
+
+{
+    "name": "US Federal Spending",
+    "type": "dataset",
+    "industry": "contracts",
+    "ticker": None,
+    "keywords": ["usaspending", "contract award"],
+    "news_urls": [],
+    "data_urls": [
+        "https://api.usaspending.gov/api/v2/awards/",
+        "https://www.usaspending.gov/",
+    ],
+    "priority": 5,
+    "tags": ["alpha", "government"],
+},
+
+{
+    "name": "SEC EDGAR",
+    "type": "dataset",
+    "industry": "filings",
+    "ticker": None,
+    "keywords": ["8-K", "10-Q", "10-K", "SEC"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.sec.gov/edgar/search/",
+        "https://www.sec.gov/Archives/edgar/data/",
+    ],
+    "priority": 5,
+    "tags": ["earnings"],
+},
+
+{
+    "name": "FRED Economic Data",
+    "type": "dataset",
+    "industry": "macro",
+    "ticker": None,
+    "keywords": ["FRED", "GDP", "yield curve", "recession"],
+    "news_urls": [],
+    "data_urls": [
+        "https://fred.stlouisfed.org/",
+        "https://api.stlouisfed.org/",
+    ],
+    "priority": 5,
+    "tags": ["macro"],
+},
+
+{
+    "name": "BLS Releases",
+    "type": "dataset",
+    "industry": "inflation/jobs",
+    "ticker": None,
+    "keywords": ["CPI", "PPI", "Payrolls", "NFP"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.bls.gov/news.release/",
+        "https://download.bls.gov/pub/time.series/",
+    ],
+    "priority": 5,
+    "tags": ["macro"],
+},
+
+{
+    "name": "ONS UK",
+    "type": "dataset",
+    "industry": "uk macro",
+    "ticker": None,
+    "keywords": ["ONS", "UK CPI", "UK GDP"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.ons.gov.uk/",
+    ],
+    "priority": 5,
+    "tags": ["uk"],
+},
+
+{
+    "name": "Eurostat",
+    "type": "dataset",
+    "industry": "eu macro",
+    "ticker": None,
+    "keywords": ["Eurostat"],
+    "news_urls": [],
+    "data_urls": [
+        "https://ec.europa.eu/eurostat",
+    ],
+    "priority": 5,
+    "tags": ["eu"],
+},
+
+{
+    "name": "UK Contracts Finder",
+    "type": "dataset",
+    "industry": "uk contracts",
+    "ticker": None,
+    "keywords": ["Contracts Finder"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.contractsfinder.service.gov.uk/",
+    ],
+    "priority": 5,
+    "tags": ["uk", "alpha"],
+},
+
+{
+    "name": "EU TED Tenders",
+    "type": "dataset",
+    "industry": "eu contracts",
+    "ticker": None,
+    "keywords": ["TED", "EU tenders"],
+    "news_urls": [],
+    "data_urls": [
+        "https://ted.europa.eu/",
+    ],
+    "priority": 5,
+    "tags": ["eu", "alpha"],
+},
+
+{
+    "name": "FDA Approvals",
+    "type": "dataset",
+    "industry": "biotech",
+    "ticker": None,
+    "keywords": ["FDA approval"],
+    "news_urls": [],
+    "data_urls": [
+        "https://open.fda.gov/",
+    ],
+    "priority": 5,
+    "tags": ["healthcare"],
+},
+
+{
+    "name": "EIA Energy Data",
+    "type": "dataset",
+    "industry": "energy",
+    "ticker": None,
+    "keywords": ["oil inventory", "natural gas", "EIA"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.eia.gov/opendata/",
+    ],
+    "priority": 4,
+    "tags": ["commodities"],
+},
+
+{
+    "name": "NOAA Weather",
+    "type": "dataset",
+    "industry": "weather",
+    "ticker": None,
+    "keywords": ["weather", "hurricane", "crop"],
+    "news_urls": [],
+    "data_urls": [
+        "https://www.noaa.gov/",
+        "https://www.weather.gov/",
+    ],
+    "priority": 4,
+    "tags": ["agriculture"],
+},
+
 ]
 
 
-# ---------------------------------------------------------------------------
-# Curated URL lists imported by main.py
-# ---------------------------------------------------------------------------
+# =====================================================================
+# ALWAYS SCRAPED URLS
+# =====================================================================
 
-# High-frequency financial news — always included in finance pipeline runs
-FINANCE_URLS: list[str] = [
+FINANCE_URLS = [
     "https://finance.yahoo.com/news/",
     "https://www.reuters.com/markets/",
     "https://www.ft.com/markets",
     "https://www.marketwatch.com/latest-news",
-    "https://www.bloomberg.com/markets",
     "https://www.cnbc.com/markets/",
     "https://seekingalpha.com/market-news",
 ]
 
-# Macro-economic data sources
-MACRO_URLS: list[str] = [
-    "https://www.federalreserve.gov/newsevents/pressreleases.htm",
-    "https://home.treasury.gov/news/press-releases",
-    "https://www.bls.gov/news.release/",          # BLS: CPI, jobs
-    "https://fred.stlouisfed.org/",               # FRED economic data
-    "https://fiscaldata.treasury.gov/datasets/",
+MACRO_URLS = [
+    "https://fred.stlouisfed.org/",
+    "https://www.bls.gov/news.release/",
+    "https://www.bankofengland.co.uk/",
+    "https://www.ecb.europa.eu/",
+    "https://www.ons.gov.uk/",
 ]
 
-# Government spending & contracts
-GOVERNMENT_URLS: list[str] = [
-    "https://www.usaspending.gov/explorer",
-    "https://www.usaspending.gov/agency",
-    "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K",
+GOVERNMENT_URLS = [
+    "https://api.usaspending.gov/api/v2/awards/",
+    "https://www.sec.gov/edgar/search/",
+    "https://www.contractsfinder.service.gov.uk/",
+    "https://ted.europa.eu/",
 ]
 
-# All finance-mode URLs combined (de-duplicated)
-ALL_FINANCE_URLS: list[str] = list(dict.fromkeys(
-    FINANCE_URLS + MACRO_URLS + GOVERNMENT_URLS
+SPECIAL_DATASETS = [
+    "https://open.fda.gov/",
+    "https://www.eia.gov/opendata/",
+    "https://www.noaa.gov/",
+]
+
+ALL_FINANCE_URLS = list(dict.fromkeys(
+    FINANCE_URLS + MACRO_URLS + GOVERNMENT_URLS + SPECIAL_DATASETS
 ))
 
 
-# ---------------------------------------------------------------------------
-# Ticker → name lookup (for price fetching)
-# ---------------------------------------------------------------------------
+# =====================================================================
+# LOOKUPS
+# =====================================================================
 
-TICKER_MAP: dict[str, str] = {
+TICKER_MAP = {
     t["ticker"]: t["name"]
     for t in TARGETS
     if t.get("ticker")
 }
 
 
-# ---------------------------------------------------------------------------
-# Entity detection (used by analyzer.py)
-# ---------------------------------------------------------------------------
-
 def detect_targets(text: str) -> list[str]:
-    """Return names of all targets mentioned in *text*."""
     text_lower = text.lower()
     matches = []
+
     for target in TARGETS:
         for keyword in target["keywords"]:
             if keyword.lower() in text_lower:
                 matches.append(target["name"])
                 break
+
     return matches
